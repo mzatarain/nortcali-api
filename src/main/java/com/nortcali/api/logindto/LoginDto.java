@@ -1,7 +1,5 @@
 package com.nortcali.api.logindto;
 
-import java.time.LocalDate;
-
 import jakarta.persistence.Column;
 
 public class LoginDto {
