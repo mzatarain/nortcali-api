@@ -8,25 +8,25 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.nortcali.api.entity.Employee;
-import com.nortcali.api.repository.EmployeeRepository;
+import com.nortcali.api.entity.Restaurant;
+import com.nortcali.api.repository.RestaurantRepository;
 
 @RestController
-@RequestMapping("/api/employees")
-public class EmployeeController {
-	private final EmployeeRepository repo;
+@RequestMapping("/api/restaurants")
+public class RestaurantController {
+	private final RestaurantRepository repo;
 	
-	public EmployeeController(EmployeeRepository repo) {
+	public RestaurantController(RestaurantRepository repo) {
 		this.repo = repo;
 	}
 	
 	@GetMapping
-	public List<Employee> all() {
+	public List<Restaurant> all(){
 		return repo.findAll();
 	}
 	
 	@PostMapping
-	public Employee create(@RequestBody Employee e) {
-		return repo.save(e);
+	public Restaurant create(@RequestBody Restaurant r) {
+		return repo.save(r);
 	}
 }

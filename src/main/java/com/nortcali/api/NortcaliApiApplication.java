@@ -8,6 +8,7 @@ public class NortcaliApiApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(NortcaliApiApplication.class, args);
+		
 	}
 
 }

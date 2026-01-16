@@ -8,25 +8,25 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.nortcali.api.entity.Employee;
-import com.nortcali.api.repository.EmployeeRepository;
+import com.nortcali.api.entity.City;
+import com.nortcali.api.repository.CityRepository;
 
 @RestController
-@RequestMapping("/api/employees")
-public class EmployeeController {
-	private final EmployeeRepository repo;
+@RequestMapping("/api/cities")
+public class CityController {
+	private final CityRepository repo;
 	
-	public EmployeeController(EmployeeRepository repo) {
+	public CityController(CityRepository repo) {
 		this.repo = repo;
 	}
 	
 	@GetMapping
-	public List<Employee> all() {
+	public List<City> all(){
 		return repo.findAll();
 	}
 	
 	@PostMapping
-	public Employee create(@RequestBody Employee e) {
-		return repo.save(e);
+	public City create(@RequestBody City c) {
+		return repo.save(c);
 	}
 }
