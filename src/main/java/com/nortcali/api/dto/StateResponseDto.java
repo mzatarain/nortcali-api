@@ -6,12 +6,14 @@ public class StateResponseDto {
     private String name;
     private String code;
     private Long countryId;
+    private String countryName;
 
-    public StateResponseDto(Long id, String name, String code, Long countryId) {
+    public StateResponseDto(Long id, String name, String code, Long countryId, String countryName) {
         this.id = id;
         this.name = name;
         this.code = code;
         this.countryId = countryId;
+        this.countryName = countryName;
     }
 
     public Long getId() {
@@ -28,5 +30,9 @@ public class StateResponseDto {
 
     public Long getCountryId() {
         return countryId;
+    }
+    
+    public String getCountryName() {
+    	return countryName;
     }
 }

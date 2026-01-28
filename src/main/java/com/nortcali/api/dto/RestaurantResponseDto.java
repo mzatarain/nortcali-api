@@ -7,32 +7,28 @@ public class RestaurantResponseDto {
     private String phone;
     private String whatsapp;
     private String addressLine;
-    private boolean isActive;
-
-    private Long countryId;
-    private Long stateId;
+    private boolean active;
     private Long cityId;
-
+    private String cityName;
+    
     public RestaurantResponseDto(
             Long id,
             String name,
             String phone,
             String whatsapp,
             String addressLine,
-            boolean isActive,
-            Long countryId,
-            Long stateId,
-            Long cityId
+            boolean active,
+            Long cityId,
+            String cityName
     ) {
         this.id = id;
         this.name = name;
         this.phone = phone;
         this.whatsapp = whatsapp;
         this.addressLine = addressLine;
-        this.isActive = isActive;
-        this.countryId = countryId;
-        this.stateId = stateId;
+        this.active = active;
         this.cityId = cityId;
+        this.cityName = cityName;
     }
 
     public Long getId() {
@@ -56,18 +52,15 @@ public class RestaurantResponseDto {
     }
 
     public boolean isActive() {
-        return isActive;
+        return active;
     }
 
-    public Long getCountryId() {
-        return countryId;
-    }
-
-    public Long getStateId() {
-        return stateId;
-    }
 
     public Long getCityId() {
         return cityId;
+    }
+    
+    public String getCityName() {
+    	return cityName;
     }
 }

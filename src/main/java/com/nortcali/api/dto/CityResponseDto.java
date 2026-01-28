@@ -5,11 +5,13 @@ public class CityResponseDto {
     private Long id;
     private String name;
     private Long stateId;
+    private String stateName;
 
-    public CityResponseDto(Long id, String name, Long stateId) {
+    public CityResponseDto(Long id, String name, Long stateId, String stateName) {
         this.id = id;
         this.name = name;
         this.stateId = stateId;
+        this.stateName = stateName;
     }
 
     public Long getId() {
@@ -22,5 +24,9 @@ public class CityResponseDto {
 
     public Long getStateId() {
         return stateId;
+    }
+    
+    public String getStateName() {
+    	return stateName;
     }
 }
