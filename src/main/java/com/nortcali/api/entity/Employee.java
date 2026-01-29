@@ -6,8 +6,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "employees")
@@ -16,41 +20,57 @@ public class Employee {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
+    @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(name = "password_hash")
+    @Column(name = "password_hash", nullable = false)
     private String password;
-
-    private String role;
-    private String status;
-    private boolean isLocked;
-
-    @ManyToOne
-    @JoinColumn(name = "restaurant_id")
-    private Restaurant restaurant;
-
-    public Employee() {
-    	
-    }
     
-    public Employee(Long id, String username, String password, String role, String status, boolean isLocked, Restaurant restaurant) {
-    	super();
-    	this.id = id;
-    	this.username = username;
-    	this.password = password;
-    	this.role = role;
-    	this.status = status;
-    	this.isLocked = isLocked;
-    	this.restaurant = restaurant;
-    }
+    @Column(nullable = false, length = 20)
+    private String role; // Admin, Manager, Staff
     
+    @Column(nullable = false, length = 20)
+    private String status; //Active, Inactive
+    
+    @Column(name = "isLocked",nullable = false)
+    private boolean locked = false;
+    
+    /* ==============
+     * RELATIONSHIPS
+     */
+    @ManyToMany
+    @JoinTable(
+    		name = "employee_restaurants",
+    		joinColumns = @JoinColumn(name = "restaurant_id")
+    		)
+    private Set<Restaurant> restaurants = new HashSet<>();
+    
+    
+//    @ManyToOne
+//    @JoinColumn(name = "restaurant_id")
+//    private Restaurant restaurant;
+//
+//    public Employee() {
+//    	
+//    }
+//    
+//    public Employee(Long id, String username, String password, String role, String status, boolean isLocked, Restaurant restaurant) {
+//    	super();
+//    	this.id = id;
+//    	this.username = username;
+//    	this.password = password;
+//    	this.role = role;
+//    	this.status = status;
+//    	this.Locked = isLocked;
+//    	this.restaurant = restaurant;
+//    }
+    
+    
+    /* =================
+     * GETTERS AND SETTERS
+     */
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public String getUsername() {
@@ -86,19 +106,19 @@ public class Employee {
     }
 
     public boolean isLocked() {
-        return isLocked;
+        return locked;
     }
 
-    public void setLocked(boolean isLocked) {
-        this.isLocked = isLocked;
+    public void setLocked(boolean locked) {
+        this.locked = locked;
     }
 
-    public Restaurant getRestaurant() {
-        return restaurant;
+    public Set<Restaurant> getRestaurant() {
+        return restaurants;
     }
 
-    public void setRestaurant(Restaurant restaurant) {
-        this.restaurant = restaurant;
+    public void setRestaurant(Set<Restaurant> restaurants) {
+        this.restaurants = restaurants;
     }
     
 
