@@ -1,0 +1,390 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "NortCali API",
+    "description": "Colección completa de endpoints para la API de gestión de restaurantes NortCali.\n\nVariables de entorno requeridas:\n- `baseUrl` → http://localhost:8082\n- `token` → se setea automáticamente al hacer login\n- `restaurantId` → 1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",      "value": "http://localhost:8082", "type": "string" },
+    { "key": "token",        "value": "",                      "type": "string" },
+    { "key": "restaurantId", "value": "1",                     "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "    console.log('Token guardado:', body.username);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin01\",\n  \"password\": \"Secure#2026\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK", "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbjAxIn0.abc123\",\n  \"username\": \"admin01\",\n  \"role\": \"ADMIN\"\n}"
+            },
+            {
+              "name": "401 Credenciales incorrectas",
+              "status": "Unauthorized", "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": 401,\n  \"error\": \"Unauthorized\",\n  \"message\": \"Bad credentials\",\n  \"timestamp\": \"2026-04-15T18:00:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            }
+          },
+          "response": [
+            { "name": "204 No Content", "status": "No Content", "code": 204, "_postman_previewlanguage": "text", "header": [], "body": "" }
+          ]
+        },
+        {
+          "name": "Me (empleado autenticado)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK", "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": 1,\n  \"firstName\": \"Carlos\",\n  \"lastName\": \"Reyes\",\n  \"username\": \"admin01\",\n  \"phone\": \"555-1234\",\n  \"email\": \"carlos@nortcali.com\",\n  \"role\": \"ADMIN\",\n  \"status\": \"ACTIVE\",\n  \"locked\": false,\n  \"hireDate\": \"2024-01-15\",\n  \"lastLogin\": \"2026-04-15T17:00:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('token', pm.response.json().token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK", "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"token\": \"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbjAxIn0.nuevo123\",\n  \"username\": \"admin01\",\n  \"role\": \"ADMIN\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "02 Roles de Empleado",
+      "item": [
+        {
+          "name": "Listar roles activos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/employee-roles", "host": ["{{baseUrl}}"], "path": ["api","v1","employee-roles"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK", "code": 200, "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\"id\":1,\"name\":\"ADMIN\",\"description\":\"Administrador del sistema\",\"isActive\":true},\n  {\"id\":3,\"name\":\"CASHIER\",\"description\":\"Cajero\",\"isActive\":true},\n  {\"id\":2,\"name\":\"MANAGER\",\"description\":\"Gerente\",\"isActive\":true},\n  {\"id\":4,\"name\":\"WAITER\",\"description\":\"Mesero\",\"isActive\":true}\n]"
+            }
+          ]
+        },
+        {
+          "name": "Obtener rol por ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/employee-roles/:id",
+              "host": ["{{baseUrl}}"], "path": ["api","v1","employee-roles",":id"],
+              "variable": [{ "key": "id", "value": "1" }]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\"id\":1,\"name\":\"ADMIN\",\"description\":\"Administrador del sistema\",\"isActive\":true}"
+            },
+            { "name": "404 No encontrado", "status": "Not Found", "code": 404, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"status\":404,\"error\":\"Not Found\",\"message\":\"EmployeeRole with id 99 not found\"}" }
+          ]
+        },
+        {
+          "name": "Crear rol",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"SUPERVISOR\",\n  \"description\": \"Supervisor de turno\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/v1/employee-roles", "host": ["{{baseUrl}}"], "path": ["api","v1","employee-roles"] }
+          },
+          "response": [
+            { "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":7,\"name\":\"SUPERVISOR\",\"description\":\"Supervisor de turno\",\"isActive\":true}" },
+            { "name": "409 Duplicado", "status": "Conflict", "code": 409, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"status\":409,\"error\":\"Conflict\",\"message\":\"Ya existe un rol con el nombre 'SUPERVISOR'\"}" }
+          ]
+        },
+        {
+          "name": "Actualizar rol",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"SUPERVISOR\",\n  \"description\": \"Supervisor de turno actualizado\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/v1/employee-roles/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","employee-roles",":id"], "variable": [{ "key": "id", "value": "7" }] }
+          },
+          "response": [
+            { "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":7,\"name\":\"SUPERVISOR\",\"description\":\"Supervisor de turno actualizado\",\"isActive\":true}" }
+          ]
+        },
+        {
+          "name": "Desactivar rol",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{baseUrl}}/api/v1/employee-roles/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","employee-roles",":id"], "variable": [{ "key": "id", "value": "7" }] }
+          },
+          "response": [
+            { "name": "204 No Content", "status": "No Content", "code": 204, "_postman_previewlanguage": "text", "header": [], "body": "" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "03 Geográfico",
+      "item": [
+        {
+          "name": "Países",
+          "item": [
+            {
+              "name": "Listar países",
+              "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/countries", "host": ["{{baseUrl}}"], "path": ["api","v1","countries"] } },
+              "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "[{\"id\":1,\"name\":\"México\",\"code\":\"MX\"}]" }]
+            },
+            {
+              "name": "Crear país",
+              "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"México\",\n  \"code\": \"MX\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/countries", "host": ["{{baseUrl}}"], "path": ["api","v1","countries"] } },
+              "response": [{ "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"México\",\"code\":\"MX\"}" }]
+            },
+            {
+              "name": "Actualizar país",
+              "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"México\",\n  \"code\": \"MX\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/countries/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","countries",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+              "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"México\",\"code\":\"MX\"}" }]
+            },
+            {
+              "name": "Eliminar país",
+              "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/countries/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","countries",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+              "response": [{ "name": "204 No Content", "status": "No Content", "code": 204, "_postman_previewlanguage": "text", "header": [], "body": "" }]
+            }
+          ]
+        },
+        {
+          "name": "Estados",
+          "item": [
+            {
+              "name": "Listar estados por país",
+              "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/states?countryId=1", "host": ["{{baseUrl}}"], "path": ["api","v1","states"], "query": [{ "key": "countryId", "value": "1" }] } },
+              "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "[{\"id\":1,\"name\":\"Jalisco\",\"countryId\":1}]" }]
+            },
+            {
+              "name": "Crear estado",
+              "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Jalisco\",\n  \"countryId\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/states", "host": ["{{baseUrl}}"], "path": ["api","v1","states"] } },
+              "response": [{ "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"Jalisco\",\"countryId\":1}" }]
+            },
+            {
+              "name": "Actualizar estado",
+              "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Jalisco\",\n  \"countryId\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/states/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","states",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+              "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"Jalisco\",\"countryId\":1}" }]
+            },
+            {
+              "name": "Eliminar estado",
+              "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/states/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","states",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+              "response": [{ "name": "204 No Content", "status": "No Content", "code": 204, "_postman_previewlanguage": "text", "header": [], "body": "" }]
+            }
+          ]
+        },
+        {
+          "name": "Ciudades",
+          "item": [
+            {
+              "name": "Listar ciudades por estado",
+              "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/cities?stateId=1", "host": ["{{baseUrl}}"], "path": ["api","v1","cities"], "query": [{ "key": "stateId", "value": "1" }] } },
+              "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "[{\"id\":1,\"name\":\"Guadalajara\",\"stateId\":1}]" }]
+            },
+            {
+              "name": "Crear ciudad",
+              "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Guadalajara\",\n  \"stateId\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/cities", "host": ["{{baseUrl}}"], "path": ["api","v1","cities"] } },
+              "response": [{ "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"Guadalajara\",\"stateId\":1}" }]
+            },
+            {
+              "name": "Actualizar ciudad",
+              "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Guadalajara\",\n  \"stateId\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/cities/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","cities",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+              "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"Guadalajara\",\"stateId\":1}" }]
+            },
+            {
+              "name": "Eliminar ciudad",
+              "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/cities/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","cities",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+              "response": [{ "name": "204 No Content", "status": "No Content", "code": 204, "_postman_previewlanguage": "text", "header": [], "body": "" }]
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "04 Restaurantes",
+      "item": [
+        {
+          "name": "Listar restaurantes",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/restaurants", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants"] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "[{\"id\":1,\"name\":\"NortCali Sucursal Centro\",\"phone\":\"33-1234-5678\",\"whatsapp\":\"33-9876-5432\",\"addressLine\":\"Av. Juárez 100\",\"isActive\":true,\"cityId\":1,\"cityName\":\"Guadalajara\"}]" }]
+        },
+        {
+          "name": "Obtener restaurante por ID",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/restaurants/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants",":id"], "variable": [{ "key": "id", "value": "{{restaurantId}}" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"NortCali Sucursal Centro\",\"phone\":\"33-1234-5678\",\"whatsapp\":\"33-9876-5432\",\"addressLine\":\"Av. Juárez 100\",\"isActive\":true,\"cityId\":1,\"cityName\":\"Guadalajara\"}" }]
+        },
+        {
+          "name": "Crear restaurante",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"NortCali Sucursal Centro\",\n  \"phone\": \"33-1234-5678\",\n  \"whatsapp\": \"33-9876-5432\",\n  \"addressLine\": \"Av. Juárez 100, Col. Centro\",\n  \"cityId\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/restaurants", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants"] } },
+          "response": [{ "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"NortCali Sucursal Centro\",\"phone\":\"33-1234-5678\",\"whatsapp\":\"33-9876-5432\",\"addressLine\":\"Av. Juárez 100, Col. Centro\",\"isActive\":true,\"cityId\":1,\"cityName\":\"Guadalajara\"}" }]
+        },
+        {
+          "name": "Actualizar restaurante",
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"NortCali Sucursal Centro\",\n  \"phone\": \"33-1234-5678\",\n  \"whatsapp\": \"33-9876-5432\",\n  \"addressLine\": \"Av. Juárez 100, Col. Centro\",\n  \"cityId\": 1\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/restaurants/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants",":id"], "variable": [{ "key": "id", "value": "{{restaurantId}}" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"NortCali Sucursal Centro\",\"phone\":\"33-1234-5678\",\"whatsapp\":\"33-9876-5432\",\"addressLine\":\"Av. Juárez 100, Col. Centro\",\"isActive\":true,\"cityId\":1,\"cityName\":\"Guadalajara\"}" }]
+        },
+        {
+          "name": "Desactivar restaurante",
+          "request": { "method": "DELETE", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/restaurants/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants",":id"], "variable": [{ "key": "id", "value": "{{restaurantId}}" }] } },
+          "response": [{ "name": "204 No Content", "status": "No Content", "code": 204, "_postman_previewlanguage": "text", "header": [], "body": "" }]
+        }
+      ]
+    },
+
+    {
+      "name": "05 Empleados",
+      "item": [
+        {
+          "name": "Listar empleados del restaurante",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantId}}/employees", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants","{{restaurantId}}","employees"] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "[{\"id\":1,\"firstName\":\"Carlos\",\"lastName\":\"Reyes\",\"username\":\"admin01\",\"phone\":\"555-1234\",\"email\":\"carlos@nortcali.com\",\"role\":\"ADMIN\",\"status\":\"ACTIVE\",\"locked\":false,\"hireDate\":\"2024-01-15\",\"lastLogin\":\"2026-04-15T17:00:00\"}]" }]
+        },
+        {
+          "name": "Crear empleado",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"María\",\n  \"lastName\": \"López\",\n  \"username\": \"mesero01\",\n  \"password\": \"TempPass#123\",\n  \"phone\": \"555-5678\",\n  \"email\": \"maria@nortcali.com\",\n  \"role\": \"WAITER\",\n  \"status\": \"ACTIVE\",\n  \"hireDate\": \"2026-04-15\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/restaurants/{{restaurantId}}/employees", "host": ["{{baseUrl}}"], "path": ["api","v1","restaurants","{{restaurantId}}","employees"] } },
+          "response": [
+            { "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":2,\"firstName\":\"María\",\"lastName\":\"López\",\"username\":\"mesero01\",\"phone\":\"555-5678\",\"email\":\"maria@nortcali.com\",\"role\":\"WAITER\",\"status\":\"ACTIVE\",\"locked\":false,\"hireDate\":\"2026-04-15\",\"lastLogin\":null}" },
+            { "name": "409 Username duplicado", "status": "Conflict", "code": 409, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"status\":409,\"error\":\"Conflict\",\"message\":\"Ya existe un empleado con el username 'mesero01'\"}" }
+          ]
+        },
+        {
+          "name": "Obtener empleado por ID",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/employees/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","employees",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"firstName\":\"Carlos\",\"lastName\":\"Reyes\",\"username\":\"admin01\",\"phone\":\"555-1234\",\"email\":\"carlos@nortcali.com\",\"role\":\"ADMIN\",\"status\":\"ACTIVE\",\"locked\":false,\"hireDate\":\"2024-01-15\",\"lastLogin\":null}" }]
+        },
+        {
+          "name": "Actualizar empleado",
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"María\",\n  \"lastName\": \"López\",\n  \"username\": \"mesero01\",\n  \"phone\": \"555-9999\",\n  \"email\": \"maria@nortcali.com\",\n  \"role\": \"WAITER\",\n  \"status\": \"ACTIVE\",\n  \"hireDate\": \"2026-04-15\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/employees/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","employees",":id"], "variable": [{ "key": "id", "value": "2" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":2,\"firstName\":\"María\",\"lastName\":\"López\",\"username\":\"mesero01\",\"phone\":\"555-9999\",\"email\":\"maria@nortcali.com\",\"role\":\"WAITER\",\"status\":\"ACTIVE\",\"locked\":false,\"hireDate\":\"2026-04-15\",\"lastLogin\":null}" }]
+        },
+        {
+          "name": "Cambiar status de empleado",
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"status\": \"INACTIVE\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/employees/:id/status", "host": ["{{baseUrl}}"], "path": ["api","v1","employees",":id","status"], "variable": [{ "key": "id", "value": "2" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":2,\"firstName\":\"María\",\"lastName\":\"López\",\"username\":\"mesero01\",\"phone\":\"555-9999\",\"email\":\"maria@nortcali.com\",\"role\":\"WAITER\",\"status\":\"INACTIVE\",\"locked\":false,\"hireDate\":\"2026-04-15\",\"lastLogin\":null}" }]
+        }
+      ]
+    },
+
+    {
+      "name": "06 Unidades de Medida",
+      "item": [
+        {
+          "name": "Listar unidades",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/units", "host": ["{{baseUrl}}"], "path": ["api","v1","units"] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "[{\"id\":1,\"name\":\"Kilogramo\",\"abbreviation\":\"kg\"},{\"id\":2,\"name\":\"Litro\",\"abbreviation\":\"l\"},{\"id\":3,\"name\":\"Pieza\",\"abbreviation\":\"pza\"}]" }]
+        },
+        {
+          "name": "Obtener unidad por ID",
+          "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": { "raw": "{{baseUrl}}/api/v1/units/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","units",":id"], "variable": [{ "key": "id", "value": "1" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":1,\"name\":\"Kilogramo\",\"abbreviation\":\"kg\"}" }]
+        },
+        {
+          "name": "Crear unidad",
+          "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Gramo\",\n  \"abbreviation\": \"g\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/units", "host": ["{{baseUrl}}"], "path": ["api","v1","units"] } },
+          "response": [{ "name": "201 Created", "status": "Created", "code": 201, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":4,\"name\":\"Gramo\",\"abbreviation\":\"g\"}" }]
+        },
+        {
+          "name": "Actualizar unidad",
+          "request": { "method": "PUT", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" },{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Gramo\",\n  \"abbreviation\": \"gr\"\n}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{baseUrl}}/api/v1/units/:id", "host": ["{{baseUrl}}"], "path": ["api","v1","units",":id"], "variable": [{ "key": "id", "value": "4" }] } },
+          "response": [{ "name": "200 OK", "status": "OK", "code": 200, "_postman_previewlanguage": "json", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": "{\"id\":4,\"name\":\"Gramo\",\"abbreviation\":\"gr\"}" }]
+        }
+      ]
+    }
+
+  ]
+}

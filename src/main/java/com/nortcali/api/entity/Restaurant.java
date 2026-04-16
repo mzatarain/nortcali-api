@@ -29,7 +29,7 @@ public class Restaurant {
     @Column(name = "address_line", length = 255)
     private String addressLine;
     
-    @Column(name="isActive", nullable = false)
+    @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
 

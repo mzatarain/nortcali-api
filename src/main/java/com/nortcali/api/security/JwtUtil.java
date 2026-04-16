@@ -43,4 +43,9 @@ public class JwtUtil {
                 .getBody()
                 .getSubject();
     }
+
+    /** Devuelve la duración de expiración en milisegundos (para calcular expiresAt al crear sesión). */
+    public long getExpiration() {
+        return expiration;
+    }
 }

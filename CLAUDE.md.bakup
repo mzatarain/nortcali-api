@@ -1,0 +1,69 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Common Commands
+
+```bash
+# Run the application
+mvn spring-boot:run
+
+# Build (skip tests)
+mvn clean package -DskipTests
+
+# Run all tests
+mvn test
+
+# Run a single test class
+mvn test -Dtest=ClassName
+
+# Run a single test method
+mvn test -Dtest=ClassName#methodName
+```
+
+The app runs on **port 8082**. Database config is loaded from `src/main/resources/env.properties`.
+
+## Architecture
+
+Spring Boot 4.0.5 REST API with a standard layered architecture:
+
+```
+Controller → Service → Repository → Entity
+```
+
+DTOs are used for all API request/response contracts to decouple the API surface from JPA entities.
+
+### Domain Model
+
+Hierarchical location structure:
+
+```
+Country → State → City → Restaurant
+```
+
+`Employee` has a `ManyToMany` relationship with `Restaurant` (join table: `employee_restaurants`).
+
+### Packages (`com.nortcali.api`)
+
+| Package | Purpose |
+|---|---|
+| `controller/` | REST endpoints — one controller per entity |
+| `entity/` | JPA entities (Employee, Country, State, City, Restaurant) |
+| `dto/` | Request/Response DTOs per entity |
+| `repository/` | Spring Data JPA repositories |
+| `service/` | `EmployeeDetailsService` implements `UserDetailsService` for Spring Security |
+| `config/` | `SecurityConfig`, `JwtAuthFilter`, `CorsConfig` |
+| `security/` | `JwtUtil` (HMAC-SHA256 token generation/validation) |
+
+### Security
+
+- All endpoints require JWT authentication except `/api/auth/**`
+- Login via `POST /api/auth/login` returns a Bearer token (24h expiry)
+- Sessions are stateless; JWT is validated per-request in `JwtAuthFilter`
+- CORS is configured to allow `http://localhost:5173` (frontend dev server)
+
+### Database
+
+- MySQL 8 at `localhost:3306/nortcali`
+- Hibernate DDL mode is `validate` — schema must exist before startup; Hibernate will not create/modify tables
+- Credentials are in `src/main/resources/env.properties` (not committed — check `.gitignore`)

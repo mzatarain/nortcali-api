@@ -1,47 +1,133 @@
 package com.nortcali.api.controller;
 
+import com.nortcali.api.dto.request.LoginRequest;
+import com.nortcali.api.dto.response.EmployeeResponse;
+import com.nortcali.api.dto.response.LoginResponse;
+import com.nortcali.api.entity.Session;
+import com.nortcali.api.exception.ResourceNotFoundException;
+import com.nortcali.api.mapper.EmployeeMapper;
+import com.nortcali.api.repository.EmployeeRepository;
+import com.nortcali.api.repository.SessionRepository;
+import com.nortcali.api.security.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-//import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import com.nortcali.api.dto.LoginRequest;
-import com.nortcali.api.dto.LoginResponse;
-import com.nortcali.api.security.JwtUtil;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-//@CrossOrigin("http://localhost:5173/signup")
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
+@Slf4j
 public class AuthController {
 
     private final AuthenticationManager authManager;
-    private final JwtUtil jwt;
+    private final JwtUtil jwtUtil;
+    private final SessionRepository sessionRepo;
+    private final EmployeeRepository employeeRepo;
+    private final EmployeeMapper employeeMapper;
 
-    public AuthController(AuthenticationManager am, JwtUtil jwt) {
-        this.authManager = am;
-        this.jwt = jwt;
+    public AuthController(AuthenticationManager authManager,
+                          JwtUtil jwtUtil,
+                          SessionRepository sessionRepo,
+                          EmployeeRepository employeeRepo,
+                          EmployeeMapper employeeMapper) {
+        this.authManager = authManager;
+        this.jwtUtil = jwtUtil;
+        this.sessionRepo = sessionRepo;
+        this.employeeRepo = employeeRepo;
+        this.employeeMapper = employeeMapper;
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
-
-    	authManager.authenticate(
-            new UsernamePasswordAuthenticationToken(
-                request.getUsername(),
-                request.getPassword()
-            )
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest) {
+        authManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
 
-        String token = jwt.generateToken(request.getUsername());
+        var employee = employeeRepo.findByUsername(request.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + request.getUsername()));
 
-        return new LoginResponse(
-            token,
-            request.getUsername(),
-            request.getRole()
-        );
+        String token = jwtUtil.generateToken(request.getUsername());
+
+        // Registrar sesión activa en tabla sessions, con fecha de expiración alineada al JWT
+        Session session = new Session();
+        session.setToken(token);
+        session.setEmployee(employee);
+        session.setIpAddress(httpRequest.getRemoteAddr());
+        session.setActive(true);
+        session.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC)
+                .plusSeconds(jwtUtil.getExpiration() / 1000));
+        sessionRepo.save(session);
+
+        log.info("Login exitoso para usuario '{}'", request.getUsername());
+        return ResponseEntity.ok(new LoginResponse(token, employee.getUsername(), employee.getRole()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            // Soft-delete: marcar sesión como inactiva
+            sessionRepo.findByTokenAndIsActiveTrue(token).ifPresent(s -> {
+                s.setActive(false);
+                sessionRepo.save(s);
+                log.info("Sesión invalidada para '{}'", s.getEmployee().getUsername());
+            });
+        }
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(HttpServletRequest httpRequest) {
+        // El JWT fue validado por JwtAuthFilter — el username ya está en el SecurityContext
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        String authHeader = httpRequest.getHeader("Authorization");
+        String oldToken = authHeader.substring(7); // "Bearer " ya validado por el filtro
+
+        // Localizar sesión activa actual (garantizado por el filtro, pero verificamos por coherencia)
+        Session oldSession = sessionRepo.findByTokenAndIsActiveTrue(oldToken)
+                .orElseThrow(() -> new ResourceNotFoundException("Sesión activa no encontrada para el token"));
+
+        var employee = employeeRepo.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
+
+        // Generar nuevo JWT
+        String newToken = jwtUtil.generateToken(username);
+
+        // Invalidar sesión anterior (rotación de token)
+        oldSession.setActive(false);
+        sessionRepo.save(oldSession);
+
+        // Crear nueva sesión con el token renovado
+        Session newSession = new Session();
+        newSession.setToken(newToken);
+        newSession.setEmployee(employee);
+        newSession.setIpAddress(httpRequest.getRemoteAddr());
+        newSession.setActive(true);
+        newSession.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC)
+                .plusSeconds(jwtUtil.getExpiration() / 1000));
+        sessionRepo.save(newSession);
+
+        log.info("Token renovado para usuario '{}'", username);
+        return ResponseEntity.ok(new LoginResponse(newToken, employee.getUsername(), employee.getRole()));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<EmployeeResponse> me() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        var employee = employeeRepo.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
+        return ResponseEntity.ok(employeeMapper.toResponse(employee));
     }
 }
 

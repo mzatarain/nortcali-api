@@ -1,0 +1,27 @@
+# Ignorar archivos que no son necesarios para compilar la imagen
+
+# Build artifacts (se generan dentro del contenedor)
+target/
+
+# Archivos de entorno local (nunca deben estar en la imagen)
+env.properties
+.env
+
+# Git
+.git
+.gitignore
+
+# IDE y herramientas
+.idea
+*.iml
+.classpath
+.project
+.settings
+
+# Documentación y notas
+*.md
+TASKS.md
+CLAUDE.md
+
+# Logs locales
+logs/

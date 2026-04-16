@@ -1,51 +1,54 @@
 package com.nortcali.api.controller;
 
-import com.nortcali.api.entity.Restaurant;
-import com.nortcali.api.entity.Employee;
-import com.nortcali.api.repository.EmployeeRepository;
-import com.nortcali.api.repository.RestaurantRepository;
-
+import com.nortcali.api.dto.request.EmployeeRequest;
+import com.nortcali.api.dto.request.EmployeeStatusRequest;
+import com.nortcali.api.dto.response.EmployeeResponse;
+import com.nortcali.api.service.EmployeeService;
+import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @RestController
-@RequestMapping("/api/employees")
+@RequestMapping("/api/v1")
+@Slf4j
 public class EmployeeController {
-	private final EmployeeRepository employeeRepository;
-	private final RestaurantRepository restaurantRepository;
-	private final PasswordEncoder passwordEncoder;
-	
-	public EmployeeController(EmployeeRepository employeeRepository, RestaurantRepository restaurantRepository, PasswordEncoder passwordEncoder) {
-		this.employeeRepository = employeeRepository;
-		this.restaurantRepository = restaurantRepository;
-		this.passwordEncoder = passwordEncoder;
-	}
-	
-	@GetMapping
-	public List<Employee> getAll() {
-		return employeeRepository.findAll();
-	}
-	
-	@PostMapping
-	public Employee create(@RequestBody Employee employee) {
-		employee.setPassword(passwordEncoder.encode(employee.getPassword()));
-		return employeeRepository.save(employee);
-	}
-	
-	@PutMapping("/{id}/restaurants")
-	public ResponseEntity<?> assignRestaurants(@PathVariable Long id, @RequestBody List<Long> restaurantIds){
-		Employee employee = employeeRepository.findById(id)
-				.orElseThrow();
-		Set<Restaurant> restaurants = new HashSet<>(restaurantRepository.findAllById(restaurantIds));
-		
-		employee.setRestaurant(restaurants);
-		employeeRepository.save(employee);
-		
-		return ResponseEntity.ok().build();
-	}
+
+    private final EmployeeService employeeService;
+
+    public EmployeeController(EmployeeService employeeService) {
+        this.employeeService = employeeService;
+    }
+
+    @GetMapping("/restaurants/{restaurantId}/employees")
+    public ResponseEntity<List<EmployeeResponse>> getByRestaurant(@PathVariable Long restaurantId) {
+        return ResponseEntity.ok(employeeService.getByRestaurant(restaurantId));
+    }
+
+    @GetMapping("/employees/{id}")
+    public ResponseEntity<EmployeeResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(employeeService.getById(id));
+    }
+
+    @PostMapping("/restaurants/{restaurantId}/employees")
+    public ResponseEntity<EmployeeResponse> create(@PathVariable Long restaurantId,
+                                                   @Valid @RequestBody EmployeeRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(employeeService.create(restaurantId, request));
+    }
+
+    @PutMapping("/employees/{id}")
+    public ResponseEntity<EmployeeResponse> update(@PathVariable Long id,
+                                                   @Valid @RequestBody EmployeeRequest request) {
+        return ResponseEntity.ok(employeeService.update(id, request));
+    }
+
+    @PutMapping("/employees/{id}/status")
+    public ResponseEntity<EmployeeResponse> updateStatus(@PathVariable Long id,
+                                                         @Valid @RequestBody EmployeeStatusRequest request) {
+        return ResponseEntity.ok(employeeService.updateStatus(id, request));
+    }
 }

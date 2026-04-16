@@ -1,5 +1,13 @@
 package com.nortcali.api.config;
 
+import com.nortcali.api.repository.SessionRepository;
+import com.nortcali.api.security.JwtUtil;
+import com.nortcali.api.service.EmployeeDetailsService;
+import io.jsonwebtoken.io.IOException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -7,24 +15,22 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import com.nortcali.api.security.JwtUtil;
-import com.nortcali.api.service.EmployeeDetailsService;
-
-import io.jsonwebtoken.io.IOException;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final EmployeeDetailsService userDetailsService;
+    private final SessionRepository sessionRepo;
 
-    public JwtAuthFilter(JwtUtil jwtUtil, EmployeeDetailsService userDetailsService) {
+    public JwtAuthFilter(JwtUtil jwtUtil,
+                         EmployeeDetailsService userDetailsService,
+                         SessionRepository sessionRepo) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
+        this.sessionRepo = sessionRepo;
     }
 
     @Override
@@ -52,21 +58,42 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (username != null &&
             SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
+            // Verificar que la sesión existe en DB, está activa y no ha expirado
+            var session = sessionRepo.findByTokenAndIsActiveTrue(token);
 
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
+            boolean sessionValid = session.isPresent();
 
-            authToken.setDetails(
-                    new WebAuthenticationDetailsSource().buildDetails(request)
-            );
+            if (sessionValid) {
+                LocalDateTime expiresAt = session.get().getExpiresAt();
+                if (expiresAt != null && expiresAt.isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
+                    // Sesión expirada — invalidar automáticamente y no autenticar
+                    var s = session.get();
+                    s.setActive(false);
+                    sessionRepo.save(s);
+                    sessionValid = false;
+                }
+            }
 
-            SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (sessionValid) {
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(username);
+
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                authToken.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request)
+                );
+
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+            // Si la sesión es inválida/expirada, no se setea autenticación.
+            // Spring Security devuelve 401 para endpoints protegidos y permite
+            // el paso a endpoints permitAll (como /logout).
         }
 
         filterChain.doFilter(request, response);
