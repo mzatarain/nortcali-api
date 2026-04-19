@@ -30,6 +30,8 @@ clientes, delivery, ventas, gastos e ingresos. Multi-restaurante desde su raíz
 
 **Puerto del servidor:** `8082` (configurado en `env.properties` vía `spring.config.import`)
 
+**CORS:** Orígenes permitidos: `http://localhost:5173` (Vite frontend dev) y `http://your-frontend-domain.com`. Configurado en `CorsConfig.java`.
+
 ---
 
 ## Comandos del proyecto
@@ -64,6 +66,12 @@ mvn clean package -DskipTests
 - El perfil `test` activa `src/test/resources/application-test.properties` que apunta a H2 en memoria con `ddl-auto=create-drop`
 - `@AutoConfigureMockMvc` viene de `org.springframework.boot.webmvc.test.autoconfigure` (package reorganizado en Spring Boot 4)
 - No requiere MySQL — H2 recrea el schema desde las entidades en cada ejecución
+- H2 URL usa `MODE=MySQL;NON_KEYWORDS=VALUE` para compatibilidad con sintaxis MySQL
+- Los repos pueden mockearse selectivamente con `@MockitoBean` mientras el stack de seguridad completo permanece real (`SecurityConfig`, `JwtAuthFilter`, `JwtUtil`, `BCryptPasswordEncoder`)
+- `ObjectMapper` se instancia directamente en los tests de integración (`new ObjectMapper()`), no como `@Autowired`, porque no siempre está auto-configurado como bean en el perfil `test`
+
+### Asserciones
+- Tests unitarios y de integración usan **AssertJ**: `assertThat(...)`, `assertThatThrownBy(...).isInstanceOf(...).hasMessageContaining(...)`
 
 ```bash
 # Correr solo tests de integración
@@ -100,6 +108,7 @@ com.nortcali.api
 - **JWT flow:** `JwtUtil` (en `security/`) genera y valida tokens; `JwtAuthFilter` (en `config/`) es el filtro de Spring Security que los intercepta en cada request.
 - **GeoService:** Country, State y City comparten una sola interfaz `GeoService` y su impl `GeoServiceImpl` — no hay servicios separados por entidad.
 - **EmployeeDetailsService:** Implementa `UserDetailsService` de Spring Security; carga el empleado por username para la autenticación JWT.
+- **AuthController — excepción a la regla:** Es el único controller que inyecta repos directamente (`EmployeeRepository`, `SessionRepository`) y `JwtUtil` + `EmployeeMapper`. No existe `AuthService` — la lógica de login/logout/refresh es orquestación delgada que vive en el controller. El resto de controllers siguen la regla estrictamente.
 - **SecurityConfig — modelo de acceso:**
 
   | Nivel | Endpoints |
@@ -114,6 +123,7 @@ com.nortcali.api
 
 - **Validación de sesión en `JwtAuthFilter`:** Además de la firma JWT (jjwt), el filtro consulta `sessions` para verificar `is_active=true` y `expires_at > now()`. Si la sesión es inválida, NO se setea autenticación (no hace `return 401` directo) — Spring Security resuelve 401 para endpoints protegidos y permite el paso a `permitAll` como `/logout`. Las sesiones expiradas se marcan `is_active=false` automáticamente.
 - **Paginación:** Los endpoints paginados usan `@ParameterObject @PageableDefault(size=20) Pageable` y devuelven `Page<T>`. Endpoints paginados: `orders`, `sales`, `expenses`, `incomes`.
+- **GET listas incluyen inactivos:** Los endpoints de lista devuelven todos los registros incluyendo `isActive = false`. El filtrado por activos es responsabilidad del consumidor.
 - **Logging:** `logback-spring.xml` en `src/main/resources/` — el appender activo se selecciona por `<springProfile>`. Dev: consola coloreada. Prod: JSON a stdout + archivo rotativo (`logs/{app}.log`). Test: consola mínima. Los niveles (`logging.level.*`) se controlan desde los `application-{profile}.properties`.
 
 ---
@@ -147,6 +157,7 @@ com.nortcali.api
 - **Request**: clase normal + anotaciones de validación (`@NotNull`, `@NotBlank`, `@Size`, `@Min`, `@DecimalMin`)
 - **Response**: Java record inmutable
 - Nunca exponer: `password_hash`, tokens, datos internos de auditoría
+- **`BigDecimal` → JSON string:** todos los campos monetarios/decimales (`amount`, `salePrice`, `unitCost`, `currentStock`, etc.) se serializan como `string` en JSON, no como `number`. Aserciones en tests deben comparar como string: `assertThat(json).isEqualTo("15.00")`
 
 ### Entidades JPA
 - Sin Lombok — getters/setters manuales, constructor vacío + constructor con parámetros
@@ -172,7 +183,9 @@ entity/converter/      ← convierte PENDING ↔ "pending" en DB
 ```
 
 Enums existentes: `OrderStatus`, `OrderType`, `OrderSource`, `PaymentMethod`,
-`MovementType`, `CashSessionStatus`, `PeriodType`.
+`MovementType`, `CashSessionStatus`, `PeriodType`, `PromotionType`.
+
+`PromotionType` tiene valores DB no estándar (`"2x1"`), por eso NO usa `.name().toLowerCase()` en el mapper — usa `entity.getType().getValue()` y el converter `PromotionTypeConverter` busca por `getValue()` en lugar de `valueOf()`.
 
 ### Excepciones custom
 
@@ -184,6 +197,16 @@ Enums existentes: `OrderStatus`, `OrderType`, `OrderSource`, `PaymentMethod`,
 | `AuthenticationException` (Spring Security) | 401 | ✅ Manejada en `GlobalExceptionHandler` |
 | `UnauthorizedException` (custom) | 401 | ⏳ Pendiente |
 | `ForbiddenException` | 403 | ⏳ Pendiente |
+
+**Formato de respuesta de error** (`GlobalExceptionHandler` → `ErrorResponse` record):
+```json
+{ "status": 404, "error": "Not Found", "message": "...", "timestamp": "..." }
+```
+Para errores de validación (`400`), la estructura es diferente — usa el campo `fields` (no `message`):
+```json
+{ "status": 400, "error": "Validation Failed", "fields": { "fieldName": "mensaje" }, "timestamp": "..." }
+```
+Usar este formato al escribir asserciones en tests de integración.
 
 ---
 
@@ -216,10 +239,12 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 | Ventas | `sales_sources`, `sales`, `sale_items` |
 | Caja | `cash_sessions`, `cash_session_items` |
 | Financiero | `financial_periods` |
+| Combos | `combos`, `combo_items` |
+| Promociones | `promotions`, `promotion_items` |
 
 ### Notas de alineación entidad ↔ DB conocidas
 
-- **`Employee`**: la entidad usa `@ManyToMany` via `employee_restaurants`. La DB también tiene una columna `restaurant_id` directa en `employees` que **no está mapeada** — datos legacy. Usar siempre `findByRestaurantsId(Long)` para consultar empleados por restaurante.
+- **`Employee`**: la entidad usa `@ManyToMany` via `employee_restaurants`. La DB también tiene una columna `restaurant_id` directa en `employees` (datos legacy) — está mapeada como `@Column(name = "restaurant_id") Long restaurantId` y se asigna en `create()` junto con el ManyToMany. Usar siempre `findByRestaurantsId(Long)` para consultar empleados por restaurante.
 - **`customers.total_orders`**: `INT` en DB → mapeado como `Integer` en la entidad.
 - **`orders.folio`**: `VARCHAR(20)` en DB. El formato `ORD-{id}-{yyyyMMdd}-{seq}` cabe en 20 chars para IDs de restaurante ≤ 99.
 
@@ -391,11 +416,15 @@ DB_PASSWORD=...
 Scripts en `src/main/resources/db/`:
 - `V2__new_modules.sql` — crea todas las tablas de los módulos nuevos (`CREATE TABLE IF NOT EXISTS`)
 - `V3__employee_roles.sql` — crea `employee_roles` e inserta 6 roles iniciales
+- `V4__expense_category_isactive.sql` — agrega `is_active TINYINT(1) NOT NULL DEFAULT 1` a `expense_categories`
+- `V5__combos_and_promotions.sql` — crea `combos`, `combo_items`, `promotions`, `promotion_items`
 
 Para aplicar manualmente:
 ```bash
 mysql -u root -p nortcali < src/main/resources/db/V2__new_modules.sql
 mysql -u root -p nortcali < src/main/resources/db/V3__employee_roles.sql
+mysql -u root -p nortcali < src/main/resources/db/V4__expense_category_isactive.sql
+mysql -u root -p nortcali < src/main/resources/db/V5__combos_and_promotions.sql
 ```
 
 Al agregar nuevas entidades: crear `V{N}__descripcion.sql` con los `ALTER TABLE` o `CREATE TABLE` necesarios y ejecutarlo **antes** de arrancar la app (Hibernate fallará en `validate` si las tablas no existen).
@@ -425,13 +454,19 @@ Los scripts SQL de `src/main/resources/db/` se ejecutan automáticamente al crea
 
 ---
 
+## Referencia frontend
+
+`docs/FRONTEND_CONTEXT.md` — guía de integración para el frontend: interfaces TypeScript completas para todos los DTOs, reglas de negocio desde la perspectiva del consumidor, y detalles de serialización. Útil como referencia rápida de shapes de request/response sin leer el código Java.
+
+---
+
 ## Lo que Claude NO debe hacer
 
 - ❌ Usar `ddl-auto=create` o `ddl-auto=update`
 - ❌ Exponer entidades JPA directamente en controllers
 - ❌ Retornar `password_hash` ni tokens en ningún response DTO
 - ❌ Poner lógica de negocio en un Controller
-- ❌ Inyectar repositorios directamente en Controllers
+- ❌ Inyectar repositorios directamente en Controllers (excepción: `AuthController` — es el único por diseño explícito)
 - ❌ Borrar registros físicamente en tablas con `is_active`
 - ❌ Crear queries que devuelvan datos de múltiples restaurantes sin filtro `restaurant_id`
 - ❌ Usar `System.out.println` — solo `@Slf4j`

@@ -42,8 +42,9 @@ public class InventoryController {
         return ResponseEntity.ok(supplyService.getLowStock(restaurantId));
     }
 
-    @GetMapping("/supplies/{id}")
-    public ResponseEntity<SupplyResponse> getSupplyById(@PathVariable Long id) {
+    @GetMapping("/restaurants/{restaurantId}/supplies/{id}")
+    public ResponseEntity<SupplyResponse> getSupplyById(@PathVariable Long restaurantId,
+                                                        @PathVariable Long id) {
         return ResponseEntity.ok(supplyService.getById(id));
     }
 
@@ -54,14 +55,16 @@ public class InventoryController {
                 .body(supplyService.create(restaurantId, request));
     }
 
-    @PutMapping("/supplies/{id}")
-    public ResponseEntity<SupplyResponse> updateSupply(@PathVariable Long id,
+    @PutMapping("/restaurants/{restaurantId}/supplies/{id}")
+    public ResponseEntity<SupplyResponse> updateSupply(@PathVariable Long restaurantId,
+                                                       @PathVariable Long id,
                                                        @Valid @RequestBody SupplyRequest request) {
         return ResponseEntity.ok(supplyService.update(id, request));
     }
 
-    @DeleteMapping("/supplies/{id}")
-    public ResponseEntity<Void> deactivateSupply(@PathVariable Long id) {
+    @DeleteMapping("/restaurants/{restaurantId}/supplies/{id}")
+    public ResponseEntity<Void> deactivateSupply(@PathVariable Long restaurantId,
+                                                 @PathVariable Long id) {
         supplyService.deactivate(id);
         return ResponseEntity.noContent().build();
     }

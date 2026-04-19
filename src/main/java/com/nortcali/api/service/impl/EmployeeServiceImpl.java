@@ -73,12 +73,13 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
         employee.setHireDate(request.getHireDate());
 
-        // Asociar al restaurante
+        // Asociar al restaurante (ManyToMany + columna legacy restaurant_id)
         var restaurant = restaurantRepo.findById(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
         Set<com.nortcali.api.entity.Restaurant> restaurants = new HashSet<>();
         restaurants.add(restaurant);
         employee.setRestaurant(restaurants);
+        employee.setRestaurantId(restaurantId);
 
         log.info("Creando empleado '{}' para restaurante {}", request.getUsername(), restaurantId);
         return mapper.toResponse(employeeRepo.save(employee));

@@ -3,6 +3,7 @@ package com.nortcali.api.service;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import com.nortcali.api.entity.Employee;
@@ -20,7 +21,7 @@ public class EmployeeDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) {
         Employee e = repo.findByUsername(username)
-            .orElseThrow();
+            .orElseThrow(() -> new UsernameNotFoundException("Employee not found: " + username));
 
         return User.builder()
             .username(e.getUsername())

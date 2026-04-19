@@ -15,6 +15,9 @@ public class ExpenseCategory {
     @Column(length = 40)
     private String type;
 
+    @Column(name = "is_active")
+    private boolean isActive = true;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_id", nullable = false)
     private Restaurant restaurant;
@@ -29,6 +32,9 @@ public class ExpenseCategory {
 
     public String getType() { return type; }
     public void setType(String type) { this.type = type; }
+
+    public boolean isActive() { return isActive; }
+    public void setActive(boolean active) { this.isActive = active; }
 
     public Restaurant getRestaurant() { return restaurant; }
     public void setRestaurant(Restaurant restaurant) { this.restaurant = restaurant; }

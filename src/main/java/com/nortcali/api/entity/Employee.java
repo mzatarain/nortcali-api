@@ -55,6 +55,9 @@ public class Employee {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
+    @Column(name = "restaurant_id")
+    private Long restaurantId;
+
     /* ==============
      * RELATIONSHIPS
      * employee_restaurants: restaurant_id → employees.id (joinColumns)
@@ -106,6 +109,9 @@ public class Employee {
 
     public LocalDateTime getLastLogin() { return lastLogin; }
     public void setLastLogin(LocalDateTime lastLogin) { this.lastLogin = lastLogin; }
+
+    public Long getRestaurantId() { return restaurantId; }
+    public void setRestaurantId(Long restaurantId) { this.restaurantId = restaurantId; }
 
     public Set<Restaurant> getRestaurant() { return restaurants; }
     public void setRestaurant(Set<Restaurant> restaurants) { this.restaurants = restaurants; }

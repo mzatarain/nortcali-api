@@ -65,8 +65,10 @@ public class ExpenseServiceImpl implements ExpenseService {
 
     @Override
     public void deleteCategory(Long id) {
-        if (!categoryRepo.existsById(id)) throw new ResourceNotFoundException("ExpenseCategory", id);
-        categoryRepo.deleteById(id);
+        ExpenseCategory entity = categoryRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ExpenseCategory", id));
+        entity.setActive(false);
+        categoryRepo.save(entity);
     }
 
     @Override @Transactional(readOnly = true)

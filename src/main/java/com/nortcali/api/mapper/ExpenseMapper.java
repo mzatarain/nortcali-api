@@ -14,6 +14,7 @@ import org.mapstruct.MappingTarget;
 public interface ExpenseMapper {
 
     @Mapping(source = "restaurant.id", target = "restaurantId")
+    @Mapping(source = "active", target = "isActive")
     ExpenseCategoryResponse toCategoryResponse(ExpenseCategory entity);
 
     @Mapping(target = "id", ignore = true)
