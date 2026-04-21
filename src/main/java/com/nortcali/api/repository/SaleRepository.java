@@ -27,4 +27,7 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     BigDecimal sumCommissionByRestaurantAndPeriod(@Param("rid") Long restaurantId,
                                                    @Param("from") LocalDate from,
                                                    @Param("to") LocalDate to);
+
+    @Query("SELECT COALESCE(SUM(s.total), 0) FROM Sale s WHERE s.cashSession.id = :sessionId AND s.isActive = true")
+    BigDecimal sumTotalByCashSessionId(@Param("sessionId") Long cashSessionId);
 }

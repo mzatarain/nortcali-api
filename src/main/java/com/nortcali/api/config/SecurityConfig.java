@@ -57,8 +57,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/countries/**", "/api/v1/states/**", "/api/v1/cities/**").hasRole("ADMIN")
 
                 // ── ADMIN o MANAGER ───────────────────────────────────────────
-                // Gestión de restaurantes y catálogos operativos
-                .requestMatchers("/api/v1/restaurants/**").hasAnyRole("ADMIN", "MANAGER")
+                // Solo el CRUD directo del restaurante; los sub-recursos (/orders,
+                // /menu, /cash-sessions, etc.) caen en anyRequest().authenticated()
+                .requestMatchers("/api/v1/restaurants", "/api/v1/restaurants/{id}").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/v1/units/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/v1/sales-sources/**").hasAnyRole("ADMIN", "MANAGER")
 

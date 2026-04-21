@@ -14,5 +14,6 @@ public record EmployeeResponse(
         String status,
         boolean locked,
         LocalDate hireDate,
-        LocalDateTime lastLogin
+        LocalDateTime lastLogin,
+        Long restaurantId
 ) {}

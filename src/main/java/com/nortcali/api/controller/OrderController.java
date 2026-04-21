@@ -10,6 +10,7 @@ import com.nortcali.api.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -33,9 +35,10 @@ public class OrderController {
     @GetMapping("/restaurants/{restaurantId}/orders")
     public ResponseEntity<Page<OrderResponse>> getOrders(
             @PathVariable Long restaurantId,
-            @RequestParam(required = false) String status,
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(orderService.getByRestaurant(restaurantId, status, pageable));
+        return ResponseEntity.ok(orderService.getByRestaurant(restaurantId, status, date, pageable));
     }
 
     @GetMapping("/restaurants/{restaurantId}/orders/{id}")

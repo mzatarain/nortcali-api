@@ -238,6 +238,7 @@ interface EmployeeResponse {
   locked: boolean;
   hireDate: string;    // "YYYY-MM-DD"
   lastLogin: string | null;  // "YYYY-MM-DDTHH:mm:ss"
+  restaurantId: number | null;  // presente para todos los roles; null solo si el empleado no tiene restaurante asignado
 }
 ```
 

@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -17,8 +17,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Page<Order> findByRestaurantIdAndStatusOrderByCreatedAtDesc(Long restaurantId, OrderStatus status, Pageable pageable);
 
+    Page<Order> findByRestaurantIdAndStatusInOrderByCreatedAtDesc(Long restaurantId, List<OrderStatus> statuses, Pageable pageable);
+
     List<Order> findByRestaurantIdAndStatus(Long restaurantId, OrderStatus status);
 
-    @Query("SELECT COALESCE(COUNT(o), 0) FROM Order o WHERE o.restaurant.id = :restaurantId AND CAST(o.createdAt AS date) = :date")
-    long countByRestaurantAndDate(@Param("restaurantId") Long restaurantId, @Param("date") LocalDate date);
+    @Query("SELECT o FROM Order o WHERE o.restaurant.id = :r AND o.createdAt >= :start AND o.createdAt < :end ORDER BY o.createdAt DESC")
+    Page<Order> findByRestaurantAndDate(@Param("r") Long restaurantId, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.restaurant.id = :r AND o.status = :status AND o.createdAt >= :start AND o.createdAt < :end ORDER BY o.createdAt DESC")
+    Page<Order> findByRestaurantAndStatusAndDate(@Param("r") Long restaurantId, @Param("status") OrderStatus status, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
+
+    @Query("SELECT o FROM Order o WHERE o.restaurant.id = :r AND o.status IN :statuses AND o.createdAt >= :start AND o.createdAt < :end ORDER BY o.createdAt DESC")
+    Page<Order> findByRestaurantAndStatusInAndDate(@Param("r") Long restaurantId, @Param("statuses") List<OrderStatus> statuses, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
+
+    // Cuenta por prefijo de folio en lugar de CAST(createdAt) para evitar problemas de zona horaria
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.restaurant.id = :restaurantId AND o.folio LIKE :folioPrefix")
+    long countByFolioPrefix(@Param("restaurantId") Long restaurantId, @Param("folioPrefix") String folioPrefix);
 }

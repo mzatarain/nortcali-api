@@ -9,11 +9,12 @@ import com.nortcali.api.dto.response.PaymentResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface OrderService {
 
-    Page<OrderResponse> getByRestaurant(Long restaurantId, String status, Pageable pageable);
+    Page<OrderResponse> getByRestaurant(Long restaurantId, List<String> statuses, LocalDate date, Pageable pageable);
 
     OrderResponse getById(Long id);
 

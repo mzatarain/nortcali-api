@@ -43,6 +43,9 @@ mvn clean install
 # Arrancar en desarrollo
 mvn spring-boot:run
 
+# Arrancar con perfil específico
+mvn spring-boot:run -Dspring-boot.run.profiles=prod
+
 # Correr tests
 mvn test
 
@@ -115,7 +118,7 @@ com.nortcali.api
   |---|---|
   | `permitAll` | `/auth/login`, `/auth/logout`, Swagger, `GET /actuator/health` |
   | `ADMIN` | `/employee-roles/**`, `/countries/**`, `/states/**`, `/cities/**` |
-  | `ADMIN` o `MANAGER` | `/restaurants/**`, `/units/**`, `/sales-sources/**` |
+  | `ADMIN` o `MANAGER` | `/restaurants` y `/restaurants/{id}` (CRUD del restaurante), `/units/**`, `/sales-sources/**` |
   | Cualquier autenticado | Todo lo demás (órdenes, menú, inventario, caja, etc.) |
 
   `@EnableMethodSecurity` activo — se pueden añadir `@PreAuthorize` en controllers/services.
@@ -247,6 +250,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - **`Employee`**: la entidad usa `@ManyToMany` via `employee_restaurants`. La DB también tiene una columna `restaurant_id` directa en `employees` (datos legacy) — está mapeada como `@Column(name = "restaurant_id") Long restaurantId` y se asigna en `create()` junto con el ManyToMany. Usar siempre `findByRestaurantsId(Long)` para consultar empleados por restaurante.
 - **`customers.total_orders`**: `INT` en DB → mapeado como `Integer` en la entidad.
 - **`orders.folio`**: `VARCHAR(20)` en DB. El formato `ORD-{id}-{yyyyMMdd}-{seq}` cabe en 20 chars para IDs de restaurante ≤ 99.
+- **`sales.cash_session_id`**: FK nullable a `cash_sessions`. Se asocia automáticamente al crear la venta desde una orden entregada si hay sesión abierta.
 
 ### Vistas SQL (usar con `nativeQuery = true`)
 | Vista | Descripción |
@@ -260,7 +264,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 | Campo | Valores |
 |-------|---------|
-| `orders.status` | `pending` → `confirmed` → `preparing` → `ready` → `delivered` → `cancelled` |
+| `orders.status` | `confirmed` → `preparing` → `ready` → `delivered` \| `cancelled` (las órdenes nacen en `confirmed`, no en `pending`) |
 | `orders.order_type` | `dine_in` \| `takeout` \| `delivery` |
 | `orders.source` | `pos` \| `whatsapp` \| `phone` \| `rappi` \| `uber_eats` \| `web` |
 | `inventory_movements.movement_type` | `entrada` \| `salida` \| `merma` \| `ajuste` |
@@ -274,8 +278,8 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 1. **Multi-restaurante:** Siempre filtrar por `restaurant_id` — nunca devolver datos de todos los restaurantes sin filtro explícito
 2. **Soft-delete:** Tablas con `is_active` nunca se borran físicamente — `entity.setActive(false); repo.save(entity)`
-3. **Stock:** Al confirmar una orden (`CONFIRMED`), descontar insumos según `recipe_ingredients`. Si `currentStock < minimumStock`, `log.warn(...)` (no bloquear)
-4. **Folio de orden:** `FolioGenerator.generateOrderFolio(restaurantId, date, sequence)` → `ORD-{id}-{yyyyMMdd}-{seq4}`
+3. **Stock:** Las órdenes nacen en `CONFIRMED` y los insumos se descuentan al crearse (`deductInventory` en `OrderServiceImpl.create()`). Si `currentStock < minimumStock`, `log.warn(...)` (no bloquear)
+4. **Folio de orden:** `FolioGenerator.generateOrderFolio(restaurantId, date, sequence)` → `ORD-{id}-{yyyyMMdd}-{seq4}`. La secuencia se calcula con `countByFolioPrefix` (LIKE en el folio) — NO con COUNT por fecha para evitar problemas de zona horaria con MVCC. `OrderServiceImpl.create()` usa `Isolation.READ_COMMITTED` para evitar snapshots obsoletos en creaciones concurrentes.
 5. **Historial de estado:** Cada cambio de `orders.status` inserta en `order_status_history`. El primer registro va con `fromStatus = null`
 6. **Transiciones de estado:** Solo se permiten las definidas en `OrderServiceImpl.ALLOWED_TRANSITIONS`
 7. **Corte de caja:** Solo una `cash_session` con `status = 'open'` por restaurante → lanza `BusinessRuleException`
@@ -283,6 +287,8 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 9. **Comisión de venta:** `commission = total * commissionPct / 100` con `RoundingMode.HALF_UP`
 10. **Ganancia neta período:** `grossIncome + totalIncomes - totalCommissions - totalExpenses`
 11. **Password:** BCrypt en `EmployeeServiceImpl`. Nunca en controllers. Nunca en response DTOs.
+12. **Venta auto-creada al entregar orden:** Al transicionar a `DELIVERED`, `OrderServiceImpl` llama `saleService.createFromOrder(orderId, employeeId)` en un bloque try/catch (fallo no revierte el estado). `createFromOrder` usa `@Transactional(propagation = REQUIRES_NEW)`. La `SalesSource` se resuelve con fallback: nombre exacto del `OrderSource` → `"pos"` → primera activa → `BusinessRuleException`. La venta se asocia a la `CashSession` activa si existe (`cash_session_id` nullable).
+13. **`totalSales` en sesión de caja abierta:** `CashSessionServiceImpl.getCurrent()` calcula `totalSales` dinámicamente con `saleRepo.sumTotalByCashSessionId(session.getId())` — el campo almacenado en `cash_sessions.total_sales` solo se persiste al cerrar la sesión.
 
 ---
 
@@ -320,6 +326,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 ### Inventario
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/supplies`
+- `GET/PUT/DELETE      /api/v1/restaurants/{restaurantId}/supplies/{id}`
 - `GET                 /api/v1/restaurants/{restaurantId}/supplies/low-stock`
 - `GET/POST            /api/v1/supplies/{supplyId}/movements`
 
@@ -331,7 +338,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - `GET                 /api/v1/restaurants/{restaurantId}/drivers/available`
 
 ### Órdenes
-- `GET/POST            /api/v1/restaurants/{restaurantId}/orders` (paginado; `?status=pending|confirmed|...` opcional)
+- `GET/POST            /api/v1/restaurants/{restaurantId}/orders` (paginado; `?status=confirmed&status=preparing` multi-valor; `?date=YYYY-MM-DD` filtro por día)
 - `GET                 /api/v1/restaurants/{restaurantId}/orders/{id}`
 - `PUT                 /api/v1/orders/{id}/status`
 - `GET                 /api/v1/orders/{id}/history`
@@ -356,6 +363,14 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 ### Roles de empleado
 - `GET/POST/PUT/DELETE /api/v1/employee-roles`
 - `GET                 /api/v1/employee-roles/{id}`
+
+### Combos
+- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/combos`
+- `GET/PUT/DELETE      /api/v1/restaurants/{restaurantId}/combos/{id}`
+
+### Promociones
+- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/promotions`
+- `GET/PUT/DELETE      /api/v1/restaurants/{restaurantId}/promotions/{id}`
 
 ### Caja
 - `POST /api/v1/restaurants/{restaurantId}/cash-sessions/open`
@@ -418,6 +433,7 @@ Scripts en `src/main/resources/db/`:
 - `V3__employee_roles.sql` — crea `employee_roles` e inserta 6 roles iniciales
 - `V4__expense_category_isactive.sql` — agrega `is_active TINYINT(1) NOT NULL DEFAULT 1` a `expense_categories`
 - `V5__combos_and_promotions.sql` — crea `combos`, `combo_items`, `promotions`, `promotion_items`
+- `V6__sale_cash_session.sql` — agrega `cash_session_id BIGINT NULL FK` a `sales`
 
 Para aplicar manualmente:
 ```bash
@@ -425,6 +441,7 @@ mysql -u root -p nortcali < src/main/resources/db/V2__new_modules.sql
 mysql -u root -p nortcali < src/main/resources/db/V3__employee_roles.sql
 mysql -u root -p nortcali < src/main/resources/db/V4__expense_category_isactive.sql
 mysql -u root -p nortcali < src/main/resources/db/V5__combos_and_promotions.sql
+mysql -u root -p nortcali < src/main/resources/db/V6__sale_cash_session.sql
 ```
 
 Al agregar nuevas entidades: crear `V{N}__descripcion.sql` con los `ALTER TABLE` o `CREATE TABLE` necesarios y ejecutarlo **antes** de arrancar la app (Hibernate fallará en `validate` si las tablas no existen).
@@ -454,9 +471,12 @@ Los scripts SQL de `src/main/resources/db/` se ejecutan automáticamente al crea
 
 ---
 
-## Referencia frontend
+## Documentación y herramientas de desarrollo
 
-`docs/FRONTEND_CONTEXT.md` — guía de integración para el frontend: interfaces TypeScript completas para todos los DTOs, reglas de negocio desde la perspectiva del consumidor, y detalles de serialización. Útil como referencia rápida de shapes de request/response sin leer el código Java.
+- `docs/FRONTEND_CONTEXT.md` — guía de integración para el frontend: interfaces TypeScript completas para todos los DTOs, reglas de negocio desde la perspectiva del consumidor, y detalles de serialización. Útil como referencia rápida de shapes de request/response sin leer el código Java.
+- `docs/API_COLLECTION.md` — colección de todos los endpoints con ejemplos de request/response, iconos de rol requerido (🔒 autenticado, 👑 ADMIN, 🏢 ADMIN o MANAGER). Base URL: `http://localhost:8082`.
+- `docs/nortcali.postman_collection.json` — colección Postman importable para pruebas manuales.
+- `TASKS.md` — seguimiento activo de tareas de desarrollo: ✅ completado, 🔴 prioritario, 🟡 pendiente calidad, 🟢 pruebas, 🔵 futuro.
 
 ---
 

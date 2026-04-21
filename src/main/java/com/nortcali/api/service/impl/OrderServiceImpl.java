@@ -10,15 +10,18 @@ import com.nortcali.api.mapper.OrderMapper;
 import com.nortcali.api.repository.*;
 import com.nortcali.api.service.InventoryMovementService;
 import com.nortcali.api.service.OrderService;
+import com.nortcali.api.service.SaleService;
 import com.nortcali.api.util.FolioGenerator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -51,6 +54,7 @@ public class OrderServiceImpl implements OrderService {
     private final MenuItemVariantRepository variantRepo;
     private final RecipeRepository recipeRepo;
     private final InventoryMovementService inventoryService;
+    private final SaleService saleService;
     private final OrderMapper mapper;
 
     public OrderServiceImpl(OrderRepository orderRepo,
@@ -64,6 +68,7 @@ public class OrderServiceImpl implements OrderService {
                             MenuItemVariantRepository variantRepo,
                             RecipeRepository recipeRepo,
                             InventoryMovementService inventoryService,
+                            SaleService saleService,
                             OrderMapper mapper) {
         this.orderRepo = orderRepo;
         this.historyRepo = historyRepo;
@@ -76,18 +81,41 @@ public class OrderServiceImpl implements OrderService {
         this.variantRepo = variantRepo;
         this.recipeRepo = recipeRepo;
         this.inventoryService = inventoryService;
+        this.saleService = saleService;
         this.mapper = mapper;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getByRestaurant(Long restaurantId, String status, Pageable pageable) {
-        if (status == null || status.isBlank()) {
-            return orderRepo.findByRestaurantIdOrderByCreatedAtDesc(restaurantId, pageable)
+    public Page<OrderResponse> getByRestaurant(Long restaurantId, List<String> statuses, LocalDate date, Pageable pageable) {
+        List<OrderStatus> parsed = (statuses == null || statuses.isEmpty()) ? List.of() :
+                statuses.stream().map(s -> parseEnum(OrderStatus.class, s, "status")).toList();
+
+        if (date == null) {
+            if (parsed.isEmpty()) {
+                return orderRepo.findByRestaurantIdOrderByCreatedAtDesc(restaurantId, pageable)
+                        .map(mapper::toResponse);
+            }
+            if (parsed.size() == 1) {
+                return orderRepo.findByRestaurantIdAndStatusOrderByCreatedAtDesc(restaurantId, parsed.getFirst(), pageable)
+                        .map(mapper::toResponse);
+            }
+            return orderRepo.findByRestaurantIdAndStatusInOrderByCreatedAtDesc(restaurantId, parsed, pageable)
                     .map(mapper::toResponse);
         }
-        OrderStatus orderStatus = parseEnum(OrderStatus.class, status, "status");
-        return orderRepo.findByRestaurantIdAndStatusOrderByCreatedAtDesc(restaurantId, orderStatus, pageable)
+
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+
+        if (parsed.isEmpty()) {
+            return orderRepo.findByRestaurantAndDate(restaurantId, start, end, pageable)
+                    .map(mapper::toResponse);
+        }
+        if (parsed.size() == 1) {
+            return orderRepo.findByRestaurantAndStatusAndDate(restaurantId, parsed.getFirst(), start, end, pageable)
+                    .map(mapper::toResponse);
+        }
+        return orderRepo.findByRestaurantAndStatusInAndDate(restaurantId, parsed, start, end, pageable)
                 .map(mapper::toResponse);
     }
 
@@ -98,8 +126,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public OrderResponse create(Long restaurantId, OrderRequest request) {
-        var restaurant = restaurantRepo.findById(restaurantId)
+        // PESSIMISTIC_WRITE serializa creaciones concurrentes del mismo restaurante,
+        // evitando duplicados en la secuencia del folio
+        var restaurant = restaurantRepo.findByIdWithLock(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
         var employee = employeeRepo.findById(request.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
@@ -111,7 +142,7 @@ public class OrderServiceImpl implements OrderService {
         // Parsear enums desde el request (con mensajes claros si son inválidos)
         order.setOrderType(parseEnum(OrderType.class, request.getOrderType(), "order_type"));
         order.setSource(parseEnum(OrderSource.class, request.getSource(), "source"));
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus(OrderStatus.CONFIRMED);
 
         if (request.getPaymentMethod() != null) {
             order.setPaymentMethod(parseEnum(PaymentMethod.class, request.getPaymentMethod(), "payment_method"));
@@ -143,13 +174,18 @@ public class OrderServiceImpl implements OrderService {
         order.getItems().addAll(items);
 
         // Generar folio: ORD-{restaurantId}-{yyyyMMdd}-{secuencia}
-        long sequence = orderRepo.countByRestaurantAndDate(restaurantId, LocalDate.now()) + 1;
-        order.setFolio(FolioGenerator.generateOrderFolio(restaurantId, LocalDate.now(), sequence));
+        LocalDate today = LocalDate.now();
+        String prefix = FolioGenerator.folioPrefix(restaurantId, today) + "%";
+        long sequence = orderRepo.countByFolioPrefix(restaurantId, prefix) + 1;
+        order.setFolio(FolioGenerator.generateOrderFolio(restaurantId, today, sequence));
 
         Order saved = orderRepo.save(order);
 
         // Registrar primer estado en historial
-        saveHistory(saved, null, OrderStatus.PENDING, employee);
+        saveHistory(saved, null, OrderStatus.CONFIRMED, employee);
+
+        // Descontar insumos al crear — la orden nace confirmada
+        deductInventory(saved);
 
         log.info("Orden creada: {} para restaurante {}", saved.getFolio(), restaurantId);
         return mapper.toResponse(saved);
@@ -180,6 +216,15 @@ public class OrderServiceImpl implements OrderService {
         // Al confirmar: descontar insumos del inventario
         if (newStatus == OrderStatus.CONFIRMED) {
             deductInventory(order);
+        }
+
+        // Al entregar: crear venta automáticamente (transacción independiente — fallo no revierte el estado)
+        if (newStatus == OrderStatus.DELIVERED) {
+            try {
+                saleService.createFromOrder(order.getId(), request.getEmployeeId());
+            } catch (Exception e) {
+                log.error("No se pudo crear la venta para la orden {}: {}", order.getFolio(), e.getMessage());
+            }
         }
 
         log.info("Orden {} cambió de {} a {}", order.getFolio(), previousStatus, newStatus);

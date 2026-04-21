@@ -19,4 +19,6 @@ public interface SaleService {
     void deactivate(Long id);
 
     List<SalesBySourceResponse> getSalesBySource(Long restaurantId);
+
+    void createFromOrder(Long orderId, Long employeeId);
 }

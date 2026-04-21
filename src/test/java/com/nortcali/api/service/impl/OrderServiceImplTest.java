@@ -26,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -120,10 +121,10 @@ class OrderServiceImplTest {
         Long menuItemId = 10L;
         BigDecimal price = new BigDecimal("80.00");
 
-        when(restaurantRepo.findById(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
+        when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
         when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
         when(menuItemRepo.findById(menuItemId)).thenReturn(Optional.of(menuItem(menuItemId, "Burrito")));
-        when(orderRepo.countByRestaurantAndDate(eq(restaurantId), any(LocalDate.class))).thenReturn(0L);
+        when(orderRepo.countByFolioPrefix(eq(restaurantId), anyString())).thenReturn(0L);
 
         // El save devuelve la misma orden que le entra (con id simulado)
         when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
@@ -150,14 +151,14 @@ class OrderServiceImplTest {
         assertThat(persisted.getTotal()).isEqualByComparingTo("160.00");
         // folio debe tener el formato ORD-1-{fecha}-0001 (seq = 0 + 1)
         assertThat(persisted.getFolio()).startsWith("ORD-1-").endsWith("-0001");
-        // status inicial = PENDING
-        assertThat(persisted.getStatus()).isEqualTo(OrderStatus.PENDING);
+        // status inicial = CONFIRMED (las órdenes nuevas nacen confirmadas)
+        assertThat(persisted.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
 
-        // Verifica que se guardó el historial con fromStatus = null, toStatus = PENDING
+        // Verifica que se guardó el historial con fromStatus = null, toStatus = CONFIRMED
         ArgumentCaptor<OrderStatusHistory> histCaptor = ArgumentCaptor.forClass(OrderStatusHistory.class);
         verify(historyRepo).save(histCaptor.capture());
         assertThat(histCaptor.getValue().getFromStatus()).isNull();
-        assertThat(histCaptor.getValue().getToStatus()).isEqualTo(OrderStatus.PENDING);
+        assertThat(histCaptor.getValue().getToStatus()).isEqualTo(OrderStatus.CONFIRMED);
     }
 
     @Test
@@ -165,11 +166,11 @@ class OrderServiceImplTest {
         Long restaurantId = 1L;
         Long employeeId = 5L;
 
-        when(restaurantRepo.findById(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
+        when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
         when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L, "Tacos")));
         when(menuItemRepo.findById(11L)).thenReturn(Optional.of(menuItem(11L, "Refresco")));
-        when(orderRepo.countByRestaurantAndDate(eq(restaurantId), any(LocalDate.class))).thenReturn(3L);
+        when(orderRepo.countByFolioPrefix(eq(restaurantId), anyString())).thenReturn(3L);
         when(orderRepo.save(any(Order.class))).thenAnswer(inv -> { Order o = inv.getArgument(0); o.setId(1L); return o; });
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
         when(mapper.toResponse(any(Order.class))).thenReturn(mock(OrderResponse.class));
@@ -195,7 +196,7 @@ class OrderServiceImplTest {
 
     @Test
     void create_restauranteNoEncontrado_lanzaResourceNotFoundException() {
-        when(restaurantRepo.findById(99L)).thenReturn(Optional.empty());
+        when(restaurantRepo.findByIdWithLock(99L)).thenReturn(Optional.empty());
 
         OrderRequest req = new OrderRequest();
         req.setOrderType("dine_in");
@@ -349,19 +350,19 @@ class OrderServiceImplTest {
         Page<Order> emptyPage = new PageImpl<>(List.of());
         when(orderRepo.findByRestaurantIdOrderByCreatedAtDesc(1L, pageable)).thenReturn(emptyPage);
 
-        service.getByRestaurant(1L, null, pageable);
+        service.getByRestaurant(1L, null, null, pageable);
 
         verify(orderRepo).findByRestaurantIdOrderByCreatedAtDesc(1L, pageable);
         verify(orderRepo, never()).findByRestaurantIdAndStatusOrderByCreatedAtDesc(any(), any(), any());
     }
 
     @Test
-    void getByRestaurant_filtroBlank_llamaQuerySinStatus() {
+    void getByRestaurant_listaVacia_llamaQuerySinStatus() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Order> emptyPage = new PageImpl<>(List.of());
         when(orderRepo.findByRestaurantIdOrderByCreatedAtDesc(1L, pageable)).thenReturn(emptyPage);
 
-        service.getByRestaurant(1L, "  ", pageable);
+        service.getByRestaurant(1L, List.of(), null, pageable);
 
         verify(orderRepo).findByRestaurantIdOrderByCreatedAtDesc(1L, pageable);
         verify(orderRepo, never()).findByRestaurantIdAndStatusOrderByCreatedAtDesc(any(), any(), any());
@@ -370,37 +371,102 @@ class OrderServiceImplTest {
     // ── getByRestaurant: con filtro de status ─────────────────────────────────
 
     @Test
-    void getByRestaurant_conFiltroStatus_llamaQueryConStatus() {
+    void getByRestaurant_unStatus_llamaQueryConStatus() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Order> emptyPage = new PageImpl<>(List.of());
         when(orderRepo.findByRestaurantIdAndStatusOrderByCreatedAtDesc(1L, OrderStatus.PENDING, pageable))
                 .thenReturn(emptyPage);
 
-        service.getByRestaurant(1L, "pending", pageable);
+        service.getByRestaurant(1L, List.of("pending"), null, pageable);
 
         verify(orderRepo).findByRestaurantIdAndStatusOrderByCreatedAtDesc(1L, OrderStatus.PENDING, pageable);
         verify(orderRepo, never()).findByRestaurantIdOrderByCreatedAtDesc(any(), any());
+        verify(orderRepo, never()).findByRestaurantIdAndStatusInOrderByCreatedAtDesc(any(), any(), any());
     }
 
     @Test
-    void getByRestaurant_filtroStatusEnMayúsculas_esAceptado() {
+    void getByRestaurant_unStatusEnMayúsculas_esAceptado() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<Order> emptyPage = new PageImpl<>(List.of());
         when(orderRepo.findByRestaurantIdAndStatusOrderByCreatedAtDesc(1L, OrderStatus.CONFIRMED, pageable))
                 .thenReturn(emptyPage);
 
-        // El parseEnum hace toUpperCase() internamente, por lo que funciona en cualquier case
-        service.getByRestaurant(1L, "CONFIRMED", pageable);
+        service.getByRestaurant(1L, List.of("CONFIRMED"), null, pageable);
 
         verify(orderRepo).findByRestaurantIdAndStatusOrderByCreatedAtDesc(1L, OrderStatus.CONFIRMED, pageable);
     }
 
     @Test
-    void getByRestaurant_filtroStatusInválido_lanzaBusinessRuleException() {
+    void getByRestaurant_variosStatus_llamaQueryIN() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Order> emptyPage = new PageImpl<>(List.of());
+        List<OrderStatus> expected = List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY);
+        when(orderRepo.findByRestaurantIdAndStatusInOrderByCreatedAtDesc(1L, expected, pageable))
+                .thenReturn(emptyPage);
+
+        service.getByRestaurant(1L, List.of("confirmed", "preparing", "ready"), null, pageable);
+
+        verify(orderRepo).findByRestaurantIdAndStatusInOrderByCreatedAtDesc(1L, expected, pageable);
+        verify(orderRepo, never()).findByRestaurantIdOrderByCreatedAtDesc(any(), any());
+        verify(orderRepo, never()).findByRestaurantIdAndStatusOrderByCreatedAtDesc(any(), any(), any());
+    }
+
+    @Test
+    void getByRestaurant_statusInválido_lanzaBusinessRuleException() {
         Pageable pageable = PageRequest.of(0, 20);
 
-        assertThatThrownBy(() -> service.getByRestaurant(1L, "inexistente", pageable))
+        assertThatThrownBy(() -> service.getByRestaurant(1L, List.of("inexistente"), null, pageable))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Valor inválido para status");
+    }
+
+    // ── getByRestaurant: filtro de fecha ──────────────────────────────────────
+
+    @Test
+    void getByRestaurant_soloFecha_llamaQueryDateSinStatus() {
+        LocalDate date = LocalDate.of(2026, 4, 20);
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Order> emptyPage = new PageImpl<>(List.of());
+        when(orderRepo.findByRestaurantAndDate(1L, start, end, pageable)).thenReturn(emptyPage);
+
+        service.getByRestaurant(1L, null, date, pageable);
+
+        verify(orderRepo).findByRestaurantAndDate(1L, start, end, pageable);
+        verify(orderRepo, never()).findByRestaurantIdOrderByCreatedAtDesc(any(), any());
+    }
+
+    @Test
+    void getByRestaurant_fechaYUnStatus_llamaQueryDateStatus() {
+        LocalDate date = LocalDate.of(2026, 4, 20);
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Order> emptyPage = new PageImpl<>(List.of());
+        when(orderRepo.findByRestaurantAndStatusAndDate(1L, OrderStatus.DELIVERED, start, end, pageable))
+                .thenReturn(emptyPage);
+
+        service.getByRestaurant(1L, List.of("delivered"), date, pageable);
+
+        verify(orderRepo).findByRestaurantAndStatusAndDate(1L, OrderStatus.DELIVERED, start, end, pageable);
+        verify(orderRepo, never()).findByRestaurantAndDate(any(), any(), any(), any());
+    }
+
+    @Test
+    void getByRestaurant_fechaYVariosStatus_llamaQueryDateStatusIn() {
+        LocalDate date = LocalDate.of(2026, 4, 20);
+        LocalDateTime start = date.atStartOfDay();
+        LocalDateTime end = date.plusDays(1).atStartOfDay();
+        Pageable pageable = PageRequest.of(0, 20);
+        List<OrderStatus> expected = List.of(OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY);
+        Page<Order> emptyPage = new PageImpl<>(List.of());
+        when(orderRepo.findByRestaurantAndStatusInAndDate(1L, expected, start, end, pageable))
+                .thenReturn(emptyPage);
+
+        service.getByRestaurant(1L, List.of("confirmed", "preparing", "ready"), date, pageable);
+
+        verify(orderRepo).findByRestaurantAndStatusInAndDate(1L, expected, start, end, pageable);
+        verify(orderRepo, never()).findByRestaurantAndDate(any(), any(), any(), any());
     }
 }

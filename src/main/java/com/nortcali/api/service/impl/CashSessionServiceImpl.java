@@ -125,9 +125,11 @@ public class CashSessionServiceImpl implements CashSessionService {
     @Override
     @Transactional(readOnly = true)
     public CashSessionResponse getCurrent(Long restaurantId) {
-        return mapper.toResponse(
-                sessionRepo.findByRestaurantIdAndStatus(restaurantId, CashSessionStatus.OPEN)
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "No hay sesión de caja abierta para el restaurante " + restaurantId)));
+        CashSession session = sessionRepo.findByRestaurantIdAndStatus(restaurantId, CashSessionStatus.OPEN)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No hay sesión de caja abierta para el restaurante " + restaurantId));
+        // totalSales se calcula dinámicamente para reflejar ventas acumuladas en la sesión activa
+        session.setTotalSales(saleRepo.sumTotalByCashSessionId(session.getId()));
+        return mapper.toResponse(session);
     }
 }
