@@ -9,7 +9,6 @@ import com.nortcali.api.mapper.UnitMapper;
 import com.nortcali.api.repository.UnitRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;

@@ -16,7 +16,12 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     List<Expense> findByRestaurantIdAndIsActiveTrue(Long restaurantId);
 
+    java.util.Optional<Expense> findByIdAndRestaurantId(Long id, Long restaurantId);
+
     Page<Expense> findByRestaurantIdAndIsActiveTrueOrderByExpenseDateDesc(Long restaurantId, Pageable pageable);
+
+    Page<Expense> findByRestaurantIdAndExpenseDateBetweenAndIsActiveTrueOrderByExpenseDateDesc(
+            Long restaurantId, LocalDate from, LocalDate to, Pageable pageable);
 
     List<Expense> findByRestaurantIdAndExpenseDateBetweenAndIsActiveTrue(
             Long restaurantId, LocalDate from, LocalDate to);

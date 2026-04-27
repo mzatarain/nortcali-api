@@ -22,6 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -52,6 +54,7 @@ public class OrderServiceImpl implements OrderService {
     private final DeliveryDriverRepository driverRepo;
     private final MenuItemRepository menuItemRepo;
     private final MenuItemVariantRepository variantRepo;
+    private final ModifierRepository modifierRepo;
     private final RecipeRepository recipeRepo;
     private final InventoryMovementService inventoryService;
     private final SaleService saleService;
@@ -66,6 +69,7 @@ public class OrderServiceImpl implements OrderService {
                             DeliveryDriverRepository driverRepo,
                             MenuItemRepository menuItemRepo,
                             MenuItemVariantRepository variantRepo,
+                            ModifierRepository modifierRepo,
                             RecipeRepository recipeRepo,
                             InventoryMovementService inventoryService,
                             SaleService saleService,
@@ -79,6 +83,7 @@ public class OrderServiceImpl implements OrderService {
         this.driverRepo = driverRepo;
         this.menuItemRepo = menuItemRepo;
         this.variantRepo = variantRepo;
+        this.modifierRepo = modifierRepo;
         this.recipeRepo = recipeRepo;
         this.inventoryService = inventoryService;
         this.saleService = saleService;
@@ -158,17 +163,11 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new ResourceNotFoundException("DeliveryDriver", request.getDriverId())));
         }
 
-        // Construir items y calcular total
+        // Construir items y calcular total (el subtotal de cada item ya incluye modificadores)
         List<OrderItem> items = buildItems(request.getItems(), order);
         BigDecimal total = items.stream()
                 .map(OrderItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        // Sumar extras
-        for (OrderItem item : items) {
-            for (OrderItemExtra extra : item.getExtras()) {
-                total = total.add(extra.getUnitPrice());
-            }
-        }
 
         order.setTotal(total);
         order.getItems().addAll(items);
@@ -193,6 +192,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderResponse updateStatus(Long id, OrderStatusUpdateRequest request) {
+        log.info(">>> OrderServiceImpl.updateStatus llamado. orderId={}, toStatus={}", id, request.getToStatus());
         Order order = findOrThrow(id);
         var employee = employeeRepo.findById(request.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
@@ -209,6 +209,16 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(newStatus);
+
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        if (newStatus == OrderStatus.PREPARING) {
+            order.setPreparingAt(now);
+        }
+        if (newStatus == OrderStatus.READY && order.getPreparingAt() != null) {
+            order.setReadyAt(now);
+            order.setPreparationTimeSeconds((int) ChronoUnit.SECONDS.between(order.getPreparingAt(), now));
+        }
+
         orderRepo.save(order);
 
         saveHistory(order, previousStatus, newStatus, employee);
@@ -220,10 +230,11 @@ public class OrderServiceImpl implements OrderService {
 
         // Al entregar: crear venta automáticamente (transacción independiente — fallo no revierte el estado)
         if (newStatus == OrderStatus.DELIVERED) {
+            log.info("Iniciando auto-creación de venta para orden {}", order.getFolio());
             try {
                 saleService.createFromOrder(order.getId(), request.getEmployeeId());
             } catch (Exception e) {
-                log.error("No se pudo crear la venta para la orden {}: {}", order.getFolio(), e.getMessage());
+                log.error("Error en auto-creación de venta para orden {}: {}", order.getFolio(), e.getMessage(), e);
             }
         }
 
@@ -274,24 +285,35 @@ public class OrderServiceImpl implements OrderService {
             item.setMenuItem(menuItem);
             item.setQuantity(dto.getQuantity());
             item.setUnitPrice(dto.getUnitPrice());
-            item.setSubtotal(dto.getUnitPrice().multiply(BigDecimal.valueOf(dto.getQuantity())));
 
             if (dto.getVariantId() != null) {
                 item.setVariant(variantRepo.findById(dto.getVariantId())
                         .orElseThrow(() -> new ResourceNotFoundException("MenuItemVariant", dto.getVariantId())));
             }
 
-            if (dto.getExtras() != null) {
-                for (var extraDto : dto.getExtras()) {
-                    var extraItem = menuItemRepo.findById(extraDto.getMenuItemId())
-                            .orElseThrow(() -> new ResourceNotFoundException("MenuItem", extraDto.getMenuItemId()));
-                    OrderItemExtra extra = new OrderItemExtra();
-                    extra.setOrderItem(item);
-                    extra.setMenuItem(extraItem);
-                    extra.setUnitPrice(extraDto.getUnitPrice());
-                    item.getExtras().add(extra);
+            // Resolver modificadores y calcular precio extra por unidad
+            BigDecimal modifierPricePerUnit = BigDecimal.ZERO;
+            if (dto.getModifiers() != null) {
+                for (var modDto : dto.getModifiers()) {
+                    var modifier = modifierRepo.findById(modDto.getModifierId())
+                            .orElseThrow(() -> new ResourceNotFoundException("Modifier", modDto.getModifierId()));
+                    OrderItemModifier oim = new OrderItemModifier();
+                    oim.setOrderItem(item);
+                    oim.setModifier(modifier);
+                    oim.setModifierName(modifier.getName());
+                    oim.setGroupName(modifier.getGroup().getName());
+                    oim.setPrice(modDto.getPrice());
+                    item.getModifiers().add(oim);
+                    modifierPricePerUnit = modifierPricePerUnit.add(modDto.getPrice());
                 }
             }
+
+            // subtotal incluye el precio de modificadores multiplicado por cantidad
+            item.setSubtotal(
+                    dto.getUnitPrice().add(modifierPricePerUnit)
+                            .multiply(BigDecimal.valueOf(dto.getQuantity()))
+            );
+
             result.add(item);
         }
         return result;

@@ -12,6 +12,7 @@ import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.OrderMapper;
 import com.nortcali.api.repository.*;
 import com.nortcali.api.service.InventoryMovementService;
+import com.nortcali.api.service.SaleService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,8 +48,10 @@ class OrderServiceImplTest {
     @Mock DeliveryDriverRepository driverRepo;
     @Mock MenuItemRepository menuItemRepo;
     @Mock MenuItemVariantRepository variantRepo;
+    @Mock ModifierRepository modifierRepo;
     @Mock RecipeRepository recipeRepo;
     @Mock InventoryMovementService inventoryService;
+    @Mock SaleService saleService;
     @Mock OrderMapper mapper;
 
     @InjectMocks

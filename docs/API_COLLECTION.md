@@ -29,6 +29,7 @@
 15. [Ventas](#15-ventas)
 16. [Caja](#16-caja)
 17. [Financiero](#17-financiero)
+18. [Modificadores](#18-modificadores)
 
 ---
 
@@ -811,12 +812,13 @@ Soft-delete en DELETE. **Response 204**.
 
 ### GET /api/v1/restaurants/{restaurantId}/orders 🔒
 
-Paginado. Acepta `?status=` para filtrar.
+Paginado. Acepta `?status=` y `?date=` para filtrar.
 
 **Query params**
-| Parámetro | Tipo | Valores |
-|-----------|------|---------|
-| `status` | string (opcional) | `pending` · `confirmed` · `preparing` · `ready` · `delivered` · `cancelled` |
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `status` | string (opcional, multi-valor) | `confirmed` · `preparing` · `ready` · `delivered` · `cancelled` |
+| `date` | YYYY-MM-DD (opcional) | Filtra órdenes del día |
 | `page` | int (default 0) | |
 | `size` | int (default 20) | |
 
@@ -830,7 +832,7 @@ Paginado. Acepta `?status=` para filtrar.
       "folio": "ORD-1-20260415-0001",
       "orderType": "dine_in",
       "source": "pos",
-      "status": "pending",
+      "status": "confirmed",
       "total": 225.00,
       "paymentMethod": null,
       "customerId": null,
@@ -840,8 +842,12 @@ Paginado. Acepta `?status=` para filtrar.
       "driverId": null,
       "driverFirstName": null,
       "createdAt": "2026-04-15T18:30:00",
+      "preparingAt": null,
+      "readyAt": null,
+      "preparationTimeSeconds": null,
       "items": [
         {
+          "id": 1,
           "menuItemId": 1,
           "menuItemName": "Tacos de Birria",
           "variantId": 1,
@@ -849,7 +855,7 @@ Paginado. Acepta `?status=` para filtrar.
           "quantity": 3,
           "unitPrice": 75.00,
           "subtotal": 225.00,
-          "extras": []
+          "modifiers": []
         }
       ]
     }
@@ -878,7 +884,9 @@ Paginado. Acepta `?status=` para filtrar.
       "variantId": 1,
       "quantity": 3,
       "unitPrice": 75.00,
-      "extras": []
+      "modifiers": [
+        { "modifierId": 5, "price": 10.00 }
+      ]
     }
   ]
 }
@@ -886,9 +894,10 @@ Paginado. Acepta `?status=` para filtrar.
 
 > `orderType`: `dine_in` | `takeout` | `delivery`  
 > `source`: `pos` | `whatsapp` | `phone` | `rappi` | `uber_eats` | `web`  
-> `paymentMethod`: `efectivo` | `tarjeta_credito` | `tarjeta_debito` | `transferencia` | `rappi` | `uber_eats` | `otro`
+> `paymentMethod`: `efectivo` | `tarjeta_credito` | `tarjeta_debito` | `transferencia` | `rappi` | `uber_eats` | `otro`  
+> `modifiers`: lista de modificadores del catálogo. Cada uno requiere `modifierId` y `price`. El servicio resuelve el nombre.
 
-**Response 201** — Objeto orden con folio generado y `status: "pending"`.
+**Response 201** — Objeto orden con folio generado y `status: "confirmed"`. El inventario se descuenta automáticamente al crear la orden.
 
 ### GET /api/v1/restaurants/{restaurantId}/orders/{id} 🔒
 
@@ -898,13 +907,14 @@ Paginado. Acepta `?status=` para filtrar.
 
 ### PUT /api/v1/orders/{id}/status 🔒
 
-Cambia el estado de la orden. Al pasar a `confirmed` descuenta inventario automáticamente.
+Cambia el estado de la orden. Al pasar a `delivered` se crea automáticamente una venta.
 
 **Transiciones permitidas:**
-`pending → confirmed | cancelled`  
 `confirmed → preparing | cancelled`  
 `preparing → ready | cancelled`  
 `ready → delivered | cancelled`
+
+> Las órdenes nacen en `confirmed`, no en `pending`. El estado `pending` existe pero no se usa en el flujo actual.
 
 **Request**
 ```json
@@ -932,18 +942,18 @@ Cambia el estado de la orden. Al pasar a `confirmed` descuenta inventario autom�
   {
     "id": 1,
     "fromStatus": null,
-    "toStatus": "pending",
+    "toStatus": "confirmed",
     "employeeId": 1,
     "employeeUsername": "mesero01",
     "changedAt": "2026-04-15T18:30:00"
   },
   {
     "id": 2,
-    "fromStatus": "pending",
-    "toStatus": "confirmed",
+    "fromStatus": "confirmed",
+    "toStatus": "preparing",
     "employeeId": 1,
     "employeeUsername": "mesero01",
-    "changedAt": "2026-04-15T18:35:00"
+    "changedAt": "2026-04-15T18:45:00"
   }
 ]
 ```
@@ -1007,7 +1017,12 @@ Registra un pago para la orden.
 
 #### GET /api/v1/restaurants/{restaurantId}/expenses 🔒
 
-Paginado. Query params: `page`, `size` (default 20, orden `expenseDate DESC`).
+Paginado. Query params: `page`, `size` (default 20, orden `expenseDate DESC`). Filtros opcionales de fecha.
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `startDate` | YYYY-MM-DD (opcional) | Fecha desde (inclusive) |
+| `endDate` | YYYY-MM-DD (opcional) | Fecha hasta (inclusive) |
 
 **Response 200**
 ```json
@@ -1022,7 +1037,8 @@ Paginado. Query params: `page`, `size` (default 20, orden `expenseDate DESC`).
       "amount": 850.00,
       "expenseDate": "2026-04-15",
       "employeeId": 1,
-      "isActive": true
+      "isActive": true,
+      "isPaid": false
     }
   ],
   "totalElements": 1,
@@ -1041,13 +1057,27 @@ Paginado. Query params: `page`, `size` (default 20, orden `expenseDate DESC`).
   "amount": 850.00,
   "expenseDate": "2026-04-15",
   "categoryId": 1,
-  "employeeId": 1
+  "employeeId": 1,
+  "isPaid": false
 }
 ```
+
+> `isPaid` es opcional — si se omite, se guarda como `false`.
 
 **Response 201** — Objeto creado.
 
 #### GET /api/v1/expenses/{id} 🔒 · PUT /api/v1/expenses/{id} 🔒
+
+#### PATCH /api/v1/restaurants/{restaurantId}/expenses/{id}/paid 🏢
+
+Actualiza únicamente el campo `isPaid` del gasto. Requiere rol `ADMIN` o `MANAGER`.
+
+**Request**
+```json
+{ "isPaid": true }
+```
+
+**Response 200** — Objeto gasto actualizado.
 
 #### DELETE /api/v1/expenses/{id} 🔒
 
@@ -1057,6 +1087,7 @@ Soft-delete. **Response 204**.
 | Código | Motivo |
 |--------|--------|
 | 400 | `concept` vacío · `amount` ≤ 0 · fecha nula |
+| 403 | Rol insuficiente en PATCH `/paid` |
 | 404 | Gasto, categoría o empleado no encontrados |
 
 ---
@@ -1178,7 +1209,12 @@ Soft-delete. **Response 204**.
 
 ### GET /api/v1/restaurants/{restaurantId}/sales 🔒
 
-Paginado. Query params: `page`, `size`.
+Paginado. Filtros de fecha opcionales.
+
+| Parámetro | Tipo | Descripción |
+|-----------|------|-------------|
+| `startDate` | YYYY-MM-DD (opcional) | Fecha desde |
+| `endDate` | YYYY-MM-DD (opcional) | Fecha hasta |
 
 **Response 200**
 ```json
@@ -1189,14 +1225,16 @@ Paginado. Query params: `page`, `size`.
       "restaurantId": 1,
       "sourceId": 2,
       "sourceName": "Rappi",
-      "folio": null,
+      "folio": "VTA-1-20260415-0001",
       "total": 350.00,
       "commission": 52.50,
       "saleDate": "2026-04-15",
       "employeeId": 1,
+      "customerName": null,
       "isActive": true,
       "items": [
         {
+          "id": 1,
           "menuItemId": 1,
           "menuItemName": "Tacos de Birria",
           "variantId": 1,
@@ -1222,13 +1260,17 @@ Paginado. Query params: `page`, `size`.
   "sourceId": 2,
   "saleDate": "2026-04-15",
   "employeeId": 1,
+  "paymentMethod": "efectivo",
+  "notes": null,
   "items": [
     { "menuItemId": 1, "variantId": 1, "quantity": 2, "subtotal": 150.00 }
   ]
 }
 ```
 
-> La comisión se calcula automáticamente: `total × commissionPct ÷ 100` (HALF_UP).
+> `paymentMethod` y `notes` son opcionales.  
+> La comisión se calcula automáticamente: `total × commissionPct ÷ 100` (HALF_UP).  
+> El folio se genera con formato `VTA-{restaurantId}-{yyyyMMdd}-{seq4}`.
 
 **Response 201** — Objeto venta con `commission` calculado.
 
@@ -1240,13 +1282,13 @@ Soft-delete. **Response 204**.
 
 ### GET /api/v1/restaurants/{restaurantId}/sales/by-source 🔒
 
-Agrupa el total de ventas y comisiones por fuente.
+Agrupa el total de ventas y comisiones por fuente. Filtros de fecha opcionales: `?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD`.
 
 **Response 200**
 ```json
 [
-  { "sourceName": "POS",   "totalSales": 5, "totalAmount": 1250.00 },
-  { "sourceName": "Rappi", "totalSales": 2, "totalAmount": 350.00  }
+  { "sourceName": "POS",   "saleCount": 5, "totalAmount": 1250.00 },
+  { "sourceName": "Rappi", "saleCount": 2, "totalAmount": 350.00  }
 ]
 ```
 
@@ -1413,6 +1455,112 @@ Cierra un período financiero (cambia `status` a `closed`).
 **Response 200** — Objeto período cerrado.
 
 **Errores** — `404` si no existe.
+
+---
+
+## 18. Modificadores
+
+Los modificadores permiten personalizar variantes de platillos (e.g. "Sin cebolla", "Extra queso"). Se organizan en grupos.
+
+### Grupos de modificadores
+
+#### GET /api/v1/restaurants/{restaurantId}/modifier-groups 🔒
+
+**Response 200**
+```json
+[
+  { "id": 1, "restaurantId": 1, "name": "Extras", "isActive": true },
+  { "id": 2, "restaurantId": 1, "name": "Sin ingrediente", "isActive": true }
+]
+```
+
+#### POST /api/v1/restaurants/{restaurantId}/modifier-groups 🔒
+
+**Request**
+```json
+{ "name": "Extras" }
+```
+
+**Response 201** — Objeto creado.
+
+#### PUT /api/v1/restaurants/{restaurantId}/modifier-groups/{id} 🔒
+
+**Request** — Misma estructura que POST. **Response 200**.
+
+#### DELETE /api/v1/restaurants/{restaurantId}/modifier-groups/{id} 🔒
+
+Soft-delete. **Response 204**.
+
+---
+
+### Modificadores
+
+#### GET /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers 🔒
+
+**Response 200**
+```json
+[
+  { "id": 1, "groupId": 1, "groupName": "Extras", "name": "Extra queso", "isActive": true },
+  { "id": 2, "groupId": 1, "groupName": "Extras", "name": "Extra carne",  "isActive": true }
+]
+```
+
+#### POST /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers 🔒
+
+**Request**
+```json
+{ "name": "Extra queso" }
+```
+
+**Response 201** — Objeto creado.
+
+#### PUT /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers/{id} 🔒
+
+**Request** — Misma estructura que POST. **Response 200**.
+
+#### DELETE /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers/{id} 🔒
+
+Soft-delete. **Response 204**.
+
+---
+
+### Modificadores de variante (precios)
+
+Asocia un modificador del catálogo a una variante de menú con un precio específico.
+
+#### GET /api/v1/menu-item-variants/{variantId}/modifiers 🔒
+
+**Response 200**
+```json
+[
+  {
+    "modifierId": 1,
+    "modifierName": "Extra queso",
+    "groupId": 1,
+    "groupName": "Extras",
+    "price": 15.00
+  }
+]
+```
+
+#### POST /api/v1/menu-item-variants/{variantId}/modifiers 🔒
+
+**Request**
+```json
+{ "modifierId": 1, "price": 15.00 }
+```
+
+**Response 201** — Objeto creado.
+
+#### DELETE /api/v1/menu-item-variants/{variantId}/modifiers/{modifierId} 🔒
+
+Elimina la asociación. **Response 204**.
+
+**Errores**
+| Código | Motivo |
+|--------|--------|
+| 400 | `name` vacío · `price` negativo |
+| 404 | Grupo, modificador o variante no encontrados |
 
 ---
 

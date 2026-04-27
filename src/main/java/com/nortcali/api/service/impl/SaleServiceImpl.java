@@ -3,15 +3,16 @@ package com.nortcali.api.service.impl;
 import com.nortcali.api.dto.request.SaleRequest;
 import com.nortcali.api.dto.response.SaleResponse;
 import com.nortcali.api.dto.response.SalesBySourceResponse;
-import com.nortcali.api.entity.CashSession;
 import com.nortcali.api.entity.Order;
 import com.nortcali.api.entity.Sale;
 import com.nortcali.api.entity.SaleItem;
 import com.nortcali.api.entity.enums.CashSessionStatus;
+import com.nortcali.api.entity.enums.PaymentMethod;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.SaleMapper;
 import com.nortcali.api.repository.*;
+import com.nortcali.api.util.FolioGenerator;
 import com.nortcali.api.service.SaleService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -63,7 +64,19 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SaleResponse> getByRestaurant(Long restaurantId, Pageable pageable) {
+    public Page<SaleResponse> getByRestaurant(Long restaurantId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        if (startDate != null && endDate != null) {
+            return saleRepo.findByRestaurantIdAndIsActiveTrueAndSaleDateBetweenOrderBySaleDateDesc(
+                    restaurantId, startDate, endDate, pageable).map(mapper::toResponse);
+        }
+        if (startDate != null) {
+            return saleRepo.findByRestaurantIdAndIsActiveTrueAndSaleDateBetweenOrderBySaleDateDesc(
+                    restaurantId, startDate, LocalDate.of(9999, 12, 31), pageable).map(mapper::toResponse);
+        }
+        if (endDate != null) {
+            return saleRepo.findByRestaurantIdAndIsActiveTrueAndSaleDateBetweenOrderBySaleDateDesc(
+                    restaurantId, LocalDate.of(1970, 1, 1), endDate, pageable).map(mapper::toResponse);
+        }
         return saleRepo.findByRestaurantIdAndIsActiveTrueOrderBySaleDateDesc(restaurantId, pageable)
                 .map(mapper::toResponse);
     }
@@ -83,11 +96,20 @@ public class SaleServiceImpl implements SaleService {
         var employee = employeeRepo.findById(request.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
 
+        LocalDate saleDate = request.getSaleDate();
+        String folioPrefix = FolioGenerator.saleFolioPrefix(restaurantId, saleDate) + "%";
+        long sequence = saleRepo.countByFolioPrefix(restaurantId, folioPrefix) + 1;
+
         Sale sale = new Sale();
         sale.setRestaurant(restaurantRepo.getReferenceById(restaurantId));
         sale.setSource(source);
         sale.setEmployee(employee);
-        sale.setSaleDate(request.getSaleDate());
+        sale.setSaleDate(saleDate);
+        sale.setFolio(FolioGenerator.generateSaleFolio(restaurantId, saleDate, sequence));
+        if (request.getPaymentMethod() != null) {
+            sale.setPaymentMethod(PaymentMethod.valueOf(request.getPaymentMethod().toUpperCase()));
+        }
+        sale.setNotes(request.getNotes());
 
         // Construir items y calcular total
         List<SaleItem> items = new ArrayList<>();
@@ -95,10 +117,13 @@ public class SaleServiceImpl implements SaleService {
         for (var dto : request.getItems()) {
             var menuItem = menuItemRepo.findById(dto.getMenuItemId())
                     .orElseThrow(() -> new ResourceNotFoundException("MenuItem", dto.getMenuItemId()));
+            BigDecimal unitPrice = dto.getSubtotal()
+                    .divide(BigDecimal.valueOf(dto.getQuantity()), 2, RoundingMode.HALF_UP);
             SaleItem item = new SaleItem();
             item.setSale(sale);
             item.setMenuItem(menuItem);
             item.setQuantity(dto.getQuantity());
+            item.setUnitPrice(unitPrice);
             item.setSubtotal(dto.getSubtotal());
             if (dto.getVariantId() != null) {
                 item.setVariant(variantRepo.findById(dto.getVariantId())
@@ -107,6 +132,7 @@ public class SaleServiceImpl implements SaleService {
             items.add(item);
             total = total.add(dto.getSubtotal());
         }
+        sale.setSubtotal(total);
         sale.setTotal(total);
 
         // Regla de negocio: commission = total * commissionPct / 100
@@ -128,8 +154,11 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<SalesBySourceResponse> getSalesBySource(Long restaurantId) {
-        return saleRepo.findSalesBySource(restaurantId).stream()
+    public List<SalesBySourceResponse> getSalesBySource(Long restaurantId, LocalDate startDate, LocalDate endDate) {
+        List<Object[]> rows = (startDate != null && endDate != null)
+                ? saleRepo.findSalesBySourceAndDateRange(restaurantId, startDate, endDate)
+                : saleRepo.findSalesBySource(restaurantId);
+        return rows.stream()
                 .map(row -> new SalesBySourceResponse(
                         (String) row[0],
                         ((Number) row[1]).longValue(),
@@ -158,27 +187,32 @@ public class SaleServiceImpl implements SaleService {
         sale.setSource(source);
         sale.setEmployee(employee);
         sale.setSaleDate(LocalDate.now());
+        sale.setFolio(order.getFolio());
+        sale.setPaymentMethod(order.getPaymentMethod());
+        sale.setCustomer(order.getCustomer());
 
-        List<SaleItem> items = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
+        List<SaleItem> saleItems = new ArrayList<>();
         for (var orderItem : order.getItems()) {
+            BigDecimal unitPrice = orderItem.getUnitPrice();
+            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(orderItem.getQuantity()));
             SaleItem saleItem = new SaleItem();
             saleItem.setSale(sale);
             saleItem.setMenuItem(orderItem.getMenuItem());
             saleItem.setVariant(orderItem.getVariant());
             saleItem.setQuantity(orderItem.getQuantity());
-            BigDecimal subtotal = orderItem.getUnitPrice()
-                    .multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+            saleItem.setUnitPrice(unitPrice);
             saleItem.setSubtotal(subtotal);
-            items.add(saleItem);
+            saleItems.add(saleItem);
             total = total.add(subtotal);
         }
 
+        sale.setSubtotal(total);
         sale.setTotal(total);
         BigDecimal commission = total.multiply(source.getCommissionPct())
                 .divide(new BigDecimal(100), 2, RoundingMode.HALF_UP);
         sale.setCommission(commission);
-        sale.getItems().addAll(items);
+        sale.setItems(saleItems);
 
         cashSessionRepo.findByRestaurantIdAndStatus(order.getRestaurant().getId(), CashSessionStatus.OPEN)
                 .ifPresent(sale::setCashSession);

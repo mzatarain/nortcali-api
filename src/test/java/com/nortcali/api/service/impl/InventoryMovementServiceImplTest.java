@@ -5,7 +5,6 @@ import com.nortcali.api.dto.response.InventoryMovementResponse;
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.InventoryMovement;
 import com.nortcali.api.entity.Supply;
-import com.nortcali.api.entity.enums.MovementType;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.InventoryMovementMapper;

@@ -24,4 +24,12 @@ public class FolioGenerator {
     public static String folioPrefix(Long restaurantId, LocalDate date) {
         return String.format("ORD-%d-%s-", restaurantId, date.format(FORMATTER));
     }
+
+    public static String generateSaleFolio(Long restaurantId, LocalDate date, long sequence) {
+        return String.format("VTA-%d-%s-%04d", restaurantId, date.format(FORMATTER), sequence);
+    }
+
+    public static String saleFolioPrefix(Long restaurantId, LocalDate date) {
+        return String.format("VTA-%d-%s-", restaurantId, date.format(FORMATTER));
+    }
 }

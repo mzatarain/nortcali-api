@@ -23,6 +23,9 @@ public class Expense {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Column(name = "is_paid", nullable = false)
+    private boolean isPaid = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_id", nullable = false)
     private Restaurant restaurant;
@@ -51,6 +54,9 @@ public class Expense {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { this.isActive = active; }
+
+    public boolean isPaid() { return isPaid; }
+    public void setPaid(boolean paid) { this.isPaid = paid; }
 
     public Restaurant getRestaurant() { return restaurant; }
     public void setRestaurant(Restaurant restaurant) { this.restaurant = restaurant; }

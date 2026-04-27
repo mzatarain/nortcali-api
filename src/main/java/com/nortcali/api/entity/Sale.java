@@ -1,5 +1,7 @@
 package com.nortcali.api.entity;
 
+import com.nortcali.api.entity.converter.PaymentMethodConverter;
+import com.nortcali.api.entity.enums.PaymentMethod;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -17,6 +19,9 @@ public class Sale {
     private String folio;
 
     @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal total = BigDecimal.ZERO;
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -24,6 +29,13 @@ public class Sale {
 
     @Column(name = "sale_date", nullable = false)
     private LocalDate saleDate;
+
+    @Convert(converter = PaymentMethodConverter.class)
+    @Column(name = "payment_method", length = 30)
+    private PaymentMethod paymentMethod;
+
+    @Column(length = 500)
+    private String notes;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
@@ -41,6 +53,10 @@ public class Sale {
     private Employee employee;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cash_session_id")
     private CashSession cashSession;
 
@@ -55,6 +71,9 @@ public class Sale {
     public String getFolio() { return folio; }
     public void setFolio(String folio) { this.folio = folio; }
 
+    public BigDecimal getSubtotal() { return subtotal; }
+    public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }
+
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
 
@@ -63,6 +82,12 @@ public class Sale {
 
     public LocalDate getSaleDate() { return saleDate; }
     public void setSaleDate(LocalDate saleDate) { this.saleDate = saleDate; }
+
+    public PaymentMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { this.isActive = active; }
@@ -75,6 +100,9 @@ public class Sale {
 
     public Employee getEmployee() { return employee; }
     public void setEmployee(Employee employee) { this.employee = employee; }
+
+    public Customer getCustomer() { return customer; }
+    public void setCustomer(Customer customer) { this.customer = customer; }
 
     public CashSession getCashSession() { return cashSession; }
     public void setCashSession(CashSession cashSession) { this.cashSession = cashSession; }

@@ -29,6 +29,8 @@ public class ExpenseRequest {
 
     private boolean isActive = true;
 
+    private Boolean isPaid;
+
     public String getConcept() { return concept; }
     public void setConcept(String concept) { this.concept = concept; }
 
@@ -46,4 +48,7 @@ public class ExpenseRequest {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { this.isActive = active; }
+
+    public Boolean getIsPaid() { return isPaid; }
+    public void setIsPaid(Boolean isPaid) { this.isPaid = isPaid; }
 }

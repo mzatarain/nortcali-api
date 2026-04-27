@@ -15,6 +15,7 @@ public interface SaleMapper {
     @Mapping(source = "source.name", target = "sourceName")
     @Mapping(source = "employee.id", target = "employeeId")
     @Mapping(source = "active", target = "isActive")
+    @Mapping(target = "customerName", expression = "java(entity.getCustomer() != null ? (entity.getCustomer().getFirstName() + (entity.getCustomer().getLastName() != null ? \" \" + entity.getCustomer().getLastName() : \"\")).trim() : null)")
     SaleResponse toResponse(Sale entity);
 
     @Mapping(source = "menuItem.id", target = "menuItemId")

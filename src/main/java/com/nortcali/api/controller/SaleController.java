@@ -10,10 +10,12 @@ import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -28,14 +30,20 @@ public class SaleController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<SaleResponse>> getAll(@PathVariable Long restaurantId,
-                                                     @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(saleService.getByRestaurant(restaurantId, pageable));
+    public ResponseEntity<Page<SaleResponse>> getAll(
+            @PathVariable Long restaurantId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(saleService.getByRestaurant(restaurantId, startDate, endDate, pageable));
     }
 
     @GetMapping("/by-source")
-    public ResponseEntity<List<SalesBySourceResponse>> getBySource(@PathVariable Long restaurantId) {
-        return ResponseEntity.ok(saleService.getSalesBySource(restaurantId));
+    public ResponseEntity<List<SalesBySourceResponse>> getBySource(
+            @PathVariable Long restaurantId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ResponseEntity.ok(saleService.getSalesBySource(restaurantId, startDate, endDate));
     }
 
     @GetMapping("/{id}")

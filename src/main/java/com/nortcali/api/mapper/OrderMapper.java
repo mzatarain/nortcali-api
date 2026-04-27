@@ -27,9 +27,8 @@ public interface OrderMapper {
     @Mapping(source = "variant.name", target = "variantName")
     OrderItemResponse toItemResponse(OrderItem entity);
 
-    @Mapping(source = "menuItem.id", target = "menuItemId")
-    @Mapping(source = "menuItem.name", target = "menuItemName")
-    OrderItemExtraResponse toExtraResponse(OrderItemExtra entity);
+    @Mapping(source = "modifier.id", target = "modifierId")
+    OrderItemModifierResponse toModifierResponse(OrderItemModifier entity);
 
     @Mapping(source = "order.id", target = "id")
     @Mapping(expression = "java(entity.getFromStatus() != null ? entity.getFromStatus().name().toLowerCase() : null)", target = "fromStatus")

@@ -1,7 +1,9 @@
 package com.nortcali.api.controller;
 
 import com.nortcali.api.dto.request.ExpenseCategoryRequest;
+import com.nortcali.api.dto.request.ExpensePaidRequest;
 import com.nortcali.api.dto.request.ExpenseRequest;
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.nortcali.api.dto.response.ExpenseCategoryResponse;
 import com.nortcali.api.dto.response.ExpenseResponse;
 import com.nortcali.api.service.ExpenseService;
@@ -15,6 +17,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.format.annotation.DateTimeFormat;
+
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -57,8 +62,10 @@ public class ExpenseController {
     @GetMapping("/expenses")
     public ResponseEntity<Page<ExpenseResponse>> getExpenses(
             @PathVariable Long restaurantId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(expenseService.getByRestaurant(restaurantId, pageable));
+        return ResponseEntity.ok(expenseService.getByRestaurant(restaurantId, startDate, endDate, pageable));
     }
 
     @GetMapping("/expenses/{id}")
@@ -77,6 +84,14 @@ public class ExpenseController {
                                                   @PathVariable Long id,
                                                   @Valid @RequestBody ExpenseRequest request) {
         return ResponseEntity.ok(expenseService.update(id, request));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PatchMapping("/expenses/{id}/paid")
+    public ResponseEntity<ExpenseResponse> updatePaidStatus(@PathVariable Long restaurantId,
+                                                            @PathVariable Long id,
+                                                            @Valid @RequestBody ExpensePaidRequest request) {
+        return ResponseEntity.ok(expenseService.updatePaidStatus(restaurantId, id, request));
     }
 
     @DeleteMapping("/expenses/{id}")

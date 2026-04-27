@@ -30,17 +30,20 @@ public interface ExpenseMapper {
     @Mapping(source = "category.name", target = "categoryName")
     @Mapping(source = "employee.id", target = "employeeId")
     @Mapping(source = "active", target = "isActive")
+    @Mapping(source = "paid", target = "isPaid")
     ExpenseResponse toResponse(Expense entity);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "restaurant", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "employee", ignore = true)
+    @Mapping(target = "paid", ignore = true)
     Expense toEntity(ExpenseRequest request);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "restaurant", ignore = true)
     @Mapping(target = "category", ignore = true)
     @Mapping(target = "employee", ignore = true)
+    @Mapping(target = "paid", ignore = true)
     void updateEntity(ExpenseRequest request, @MappingTarget Expense entity);
 }

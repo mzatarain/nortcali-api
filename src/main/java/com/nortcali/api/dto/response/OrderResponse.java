@@ -20,5 +20,8 @@ public record OrderResponse(
         Long driverId,
         String driverFirstName,
         LocalDateTime createdAt,
+        LocalDateTime preparingAt,
+        LocalDateTime readyAt,
+        Integer preparationTimeSeconds,
         List<OrderItemResponse> items
 ) {}

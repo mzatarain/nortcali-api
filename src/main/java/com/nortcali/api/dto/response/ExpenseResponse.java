@@ -12,5 +12,6 @@ public record ExpenseResponse(
         BigDecimal amount,
         LocalDate expenseDate,
         Long employeeId,
-        boolean isActive
+        boolean isActive,
+        boolean isPaid
 ) {}

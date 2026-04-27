@@ -34,7 +34,7 @@ public class OrderItem {
     private MenuItemVariant variant;
 
     @OneToMany(mappedBy = "orderItem", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItemExtra> extras = new ArrayList<>();
+    private List<OrderItemModifier> modifiers = new ArrayList<>();
 
     public OrderItem() {}
 
@@ -59,6 +59,6 @@ public class OrderItem {
     public MenuItemVariant getVariant() { return variant; }
     public void setVariant(MenuItemVariant variant) { this.variant = variant; }
 
-    public List<OrderItemExtra> getExtras() { return extras; }
-    public void setExtras(List<OrderItemExtra> extras) { this.extras = extras; }
+    public List<OrderItemModifier> getModifiers() { return modifiers; }
+    public void setModifiers(List<OrderItemModifier> modifiers) { this.modifiers = modifiers; }
 }

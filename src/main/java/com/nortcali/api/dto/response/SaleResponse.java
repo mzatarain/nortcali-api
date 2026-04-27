@@ -14,6 +14,7 @@ public record SaleResponse(
         BigDecimal commission,
         LocalDate saleDate,
         Long employeeId,
+        String customerName,
         boolean isActive,
         List<SaleItemResponse> items
 ) {}

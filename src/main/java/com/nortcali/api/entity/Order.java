@@ -45,6 +45,15 @@ public class Order {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "preparing_at")
+    private LocalDateTime preparingAt;
+
+    @Column(name = "ready_at")
+    private LocalDateTime readyAt;
+
+    @Column(name = "preparation_time_seconds")
+    private Integer preparationTimeSeconds;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_id", nullable = false)
     private Restaurant restaurant;
@@ -96,6 +105,15 @@ public class Order {
     public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public LocalDateTime getPreparingAt() { return preparingAt; }
+    public void setPreparingAt(LocalDateTime preparingAt) { this.preparingAt = preparingAt; }
+
+    public LocalDateTime getReadyAt() { return readyAt; }
+    public void setReadyAt(LocalDateTime readyAt) { this.readyAt = readyAt; }
+
+    public Integer getPreparationTimeSeconds() { return preparationTimeSeconds; }
+    public void setPreparationTimeSeconds(Integer preparationTimeSeconds) { this.preparationTimeSeconds = preparationTimeSeconds; }
 
     public Restaurant getRestaurant() { return restaurant; }
     public void setRestaurant(Restaurant restaurant) { this.restaurant = restaurant; }

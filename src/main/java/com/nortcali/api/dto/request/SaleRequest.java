@@ -18,6 +18,10 @@ public class SaleRequest {
     @NotNull(message = "El empleado es obligatorio")
     private Long employeeId;
 
+    private String paymentMethod;
+
+    private String notes;
+
     @NotEmpty(message = "La venta debe tener al menos un ítem")
     @Valid
     private List<SaleItemRequest> items;
@@ -30,6 +34,12 @@ public class SaleRequest {
 
     public Long getEmployeeId() { return employeeId; }
     public void setEmployeeId(Long employeeId) { this.employeeId = employeeId; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public List<SaleItemRequest> getItems() { return items; }
     public void setItems(List<SaleItemRequest> items) { this.items = items; }

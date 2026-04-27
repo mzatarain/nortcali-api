@@ -49,8 +49,11 @@ mvn spring-boot:run -Dspring-boot.run.profiles=prod
 # Correr tests
 mvn test
 
-# Test específico
+# Test específico (clase)
 mvn test -Dtest=NombreDelTest
+
+# Test específico (método)
+mvn test -Dtest=NombreDelTest#nombreDelMetodo
 
 # JAR ejecutable
 mvn clean package -DskipTests
@@ -126,7 +129,10 @@ com.nortcali.api
 
 - **Validación de sesión en `JwtAuthFilter`:** Además de la firma JWT (jjwt), el filtro consulta `sessions` para verificar `is_active=true` y `expires_at > now()`. Si la sesión es inválida, NO se setea autenticación (no hace `return 401` directo) — Spring Security resuelve 401 para endpoints protegidos y permite el paso a `permitAll` como `/logout`. Las sesiones expiradas se marcan `is_active=false` automáticamente.
 - **Paginación:** Los endpoints paginados usan `@ParameterObject @PageableDefault(size=20) Pageable` y devuelven `Page<T>`. Endpoints paginados: `orders`, `sales`, `expenses`, `incomes`.
+- **CORS — métodos permitidos:** `CorsConfig` lista explícitamente los métodos HTTP: `GET, POST, PUT, PATCH, DELETE, OPTIONS`. Al añadir un endpoint con un método nuevo, verificar que esté en esta lista — su ausencia produce 403 en el DispatcherServlet sin ninguna traza en Spring Security (el filtro CORS de Spring MVC corre después del filter chain).
+- **Restricción de rol en sub-recursos:** Para endpoints dentro de `/restaurants/{id}/...` que requieren rol específico, usar `@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")` en el método del controller en lugar de `requestMatchers` en `SecurityConfig`. Los `requestMatchers` en SecurityConfig solo cubren paths de nivel superior (sin sub-recursos de restaurante).
 - **GET listas incluyen inactivos:** Los endpoints de lista devuelven todos los registros incluyendo `isActive = false`. El filtrado por activos es responsabilidad del consumidor.
+- **Filtros de fecha parciales — fechas centinela:** Cuando un endpoint acepta `startDate` y `endDate` opcionales y el repo solo expone un método `findBy...BetweenOrderBy...`, el service usa fechas centinela para el límite ausente: `LocalDate.of(1970, 1, 1)` si solo hay `endDate`, y `LocalDate.of(9999, 12, 31)` si solo hay `startDate`. Seguir este patrón al agregar filtros de fecha a nuevos servicios (ver `ExpenseServiceImpl.getByRestaurant` y `SaleServiceImpl.getByRestaurant`).
 - **Logging:** `logback-spring.xml` en `src/main/resources/` — el appender activo se selecciona por `<springProfile>`. Dev: consola coloreada. Prod: JSON a stdout + archivo rotativo (`logs/{app}.log`). Test: consola mínima. Los niveles (`logging.level.*`) se controlan desde los `application-{profile}.properties`.
 
 ---
@@ -165,17 +171,23 @@ com.nortcali.api
 ### Entidades JPA
 - Sin Lombok — getters/setters manuales, constructor vacío + constructor con parámetros
 - `@Column(name = "snake_case")` para campos cuyo nombre Java difiere de la columna DB
-- Campos booleanos con `is_active`: usar `@Column(name = "is_active")`
+- Campos booleanos `is*`: la columna DB lleva el prefijo `is_` en snake_case (`@Column(name = "is_active")`, `@Column(name = "is_paid")`). El campo Java se declara con el mismo nombre (`private boolean isActive`, `private boolean isPaid`).
 - Timestamps con `@PrePersist`
-- **Convención setter de `isActive`:** el setter se llama `setActive(boolean)`, no `setIsActive`. Esto hace que MapStruct derive el nombre de propiedad como `active`.
+- **Convención setter de campos `is*`:** el setter omite el prefijo `is` — `setActive(boolean)`, `setPaid(boolean)`, no `setIsActive`/`setIsPaid`. MapStruct deriva la propiedad del setter, no del campo: `active`, `paid`, etc.
 
-### Mappers — patrón obligatorio para `isActive`
-Todos los mappers que convierten una entidad con `isActive` a un Java Record con componente `boolean isActive` **deben** declarar explícitamente:
+### Mappers — patrón obligatorio para campos booleanos `is*`
+Cualquier campo boolean `is*` en una entidad (p.ej. `isActive`, `isPaid`) produce una asimetría: MapStruct deriva el nombre de propiedad del setter (`active`, `paid`) pero el record usa el nombre del componente (`isActive`, `isPaid`). El mapping explícito es obligatorio:
 ```java
-@Mapping(source = "active", target = "isActive")
+@Mapping(source = "active", target = "isActive")  // isActive / setActive
+@Mapping(source = "paid",   target = "isPaid")    // isPaid / setPaid
 XxxResponse toResponse(Xxx entity);
 ```
-Sin esto, MapStruct no puede emparejar la propiedad `active` del entity (derivada del getter `isActive()`) con el componente `isActive` del record, y el campo siempre queda `false`.
+Sin esto el campo queda siempre `false`. Al agregar cualquier nuevo boolean `is*` a una entidad, verificar que el mapper declare su `@Mapping` correspondiente.
+
+Al ignorar `is*` en mapeos de entrada (`toEntity`, `updateEntity`), usar el nombre de propiedad del setter:
+```java
+@Mapping(target = "paid", ignore = true)  // no "isPaid"
+```
 
 ### Enums y conversores
 Los enums del dominio se almacenan en **lowercase** en MySQL. Cada uno tiene su `AttributeConverter`:
@@ -219,8 +231,8 @@ Usar este formato al escribir asserciones en tests de integración.
 El schema se gestiona con scripts SQL en `src/main/resources/db/`.
 
 > **Advertencia — columnas extra no mapeadas:** La DB tiene columnas adicionales en
-> varias tablas (`customers.last_name`, `orders.delivery_address`, `employees.hire_date`,
-> etc.) que aún no están mapeadas en las entidades. Hibernate `validate` las ignora.
+> varias tablas (p.ej. `orders.delivery_address`) que aún no están mapeadas en las
+> entidades. Hibernate `validate` las ignora.
 > Al añadir mapeos nuevos, verificar siempre contra la DB real antes de arrancar.
 
 ### Estado de implementación de módulos
@@ -236,7 +248,8 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 | Inventario | `units`, `supplies`, `inventory_movements` |
 | Recetas | `recipes`, `recipe_ingredients` |
 | Clientes & Delivery | `customers`, `delivery_drivers` |
-| Órdenes | `orders`, `order_items`, `order_item_extras`, `order_status_history`, `payments` |
+| Modificadores | `modifier_groups`, `modifiers`, `variant_modifiers`, `order_item_modifiers` |
+| Órdenes | `orders`, `order_items`, `order_item_modifiers`, `order_status_history`, `payments` |
 | Gastos | `expense_categories`, `expenses` |
 | Ingresos | `income_categories`, `incomes` |
 | Ventas | `sales_sources`, `sales`, `sale_items` |
@@ -249,8 +262,11 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 - **`Employee`**: la entidad usa `@ManyToMany` via `employee_restaurants`. La DB también tiene una columna `restaurant_id` directa en `employees` (datos legacy) — está mapeada como `@Column(name = "restaurant_id") Long restaurantId` y se asigna en `create()` junto con el ManyToMany. Usar siempre `findByRestaurantsId(Long)` para consultar empleados por restaurante.
 - **`customers.total_orders`**: `INT` en DB → mapeado como `Integer` en la entidad.
+- **`customers.last_name`**: `VARCHAR(80)` nullable — ya mapeado en la entidad.
 - **`orders.folio`**: `VARCHAR(20)` en DB. El formato `ORD-{id}-{yyyyMMdd}-{seq}` cabe en 20 chars para IDs de restaurante ≤ 99.
-- **`sales.cash_session_id`**: FK nullable a `cash_sessions`. Se asocia automáticamente al crear la venta desde una orden entregada si hay sesión abierta.
+- **`sales`**: columnas `subtotal`, `payment_method`, `notes`, `customer_id`, `cash_session_id` — todas mapeadas en la entidad `Sale`. `folio` usa el mismo valor que la orden de origen (auto-creación) o `VTA-{id}-{yyyyMMdd}-{seq4}` (creación manual).
+- **`sale_items.unit_price`**: `DECIMAL NOT NULL` — mapeado en `SaleItem`. En auto-creación se copia de `orderItem.unitPrice`; en creación manual se deriva de `subtotal / quantity`.
+- **`order_item_extras` — código muerto:** La tabla existe en DB (creada en V2) y los archivos `OrderItemExtra.java`, `OrderItemExtraRequest.java`, `OrderItemExtraResponse.java` aún están en el repo, pero ningún servicio ni controller los referencia. Fueron reemplazados por el sistema de modificadores (`order_item_modifiers`). No extender ni usar estos archivos.
 
 ### Vistas SQL (usar con `nativeQuery = true`)
 | Vista | Descripción |
@@ -287,8 +303,12 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 9. **Comisión de venta:** `commission = total * commissionPct / 100` con `RoundingMode.HALF_UP`
 10. **Ganancia neta período:** `grossIncome + totalIncomes - totalCommissions - totalExpenses`
 11. **Password:** BCrypt en `EmployeeServiceImpl`. Nunca en controllers. Nunca en response DTOs.
-12. **Venta auto-creada al entregar orden:** Al transicionar a `DELIVERED`, `OrderServiceImpl` llama `saleService.createFromOrder(orderId, employeeId)` en un bloque try/catch (fallo no revierte el estado). `createFromOrder` usa `@Transactional(propagation = REQUIRES_NEW)`. La `SalesSource` se resuelve con fallback: nombre exacto del `OrderSource` → `"pos"` → primera activa → `BusinessRuleException`. La venta se asocia a la `CashSession` activa si existe (`cash_session_id` nullable).
+12. **Venta auto-creada al entregar orden:** Al transicionar a `DELIVERED`, `OrderServiceImpl` llama `saleService.createFromOrder(orderId, employeeId)` en un bloque try/catch (fallo no revierte el estado). `createFromOrder` usa `@Transactional(propagation = REQUIRES_NEW)`. La `SalesSource` se resuelve con fallback: nombre exacto del `OrderSource` → `"pos"` → primera activa → `BusinessRuleException`. El folio de la venta es igual al folio de la orden. Se copian `paymentMethod` y `customer` de la orden. Se asocia a la `CashSession` activa si existe.
+    - **Folio ventas manuales:** `FolioGenerator.generateSaleFolio(restaurantId, date, sequence)` → `VTA-{id}-{yyyyMMdd}-{seq4}`
 13. **`totalSales` en sesión de caja abierta:** `CashSessionServiceImpl.getCurrent()` calcula `totalSales` dinámicamente con `saleRepo.sumTotalByCashSessionId(session.getId())` — el campo almacenado en `cash_sessions.total_sales` solo se persiste al cerrar la sesión.
+14. **Tiempo de preparación de orden:** Al transicionar a `PREPARING` se registra `preparingAt = now(UTC)`. Al transicionar a `READY`, si `preparingAt != null`, se calcula `preparationTimeSeconds = ChronoUnit.SECONDS.between(preparingAt, now)` y se guarda `readyAt`. Si la orden pasa a `CANCELLED` tras `PREPARING`, `preparingAt` queda guardado pero `readyAt` y `preparationTimeSeconds` quedan `null`. Si llega a `READY` sin haber pasado por `PREPARING`, `preparationTimeSeconds` queda `null`.
+15. **`isPaid` en gastos:** Los gastos tienen `is_paid BOOLEAN NOT NULL DEFAULT FALSE`. El endpoint `PATCH /restaurants/{restaurantId}/expenses/{id}/paid` (requiere rol `ADMIN` o `MANAGER`) actualiza solo ese campo. En `create` y `update`, `isPaid` es opcional en el request (null se interpreta como false).
+16. **Subtotal de ítem con modificadores:** `item.subtotal = (unitPrice + sum(modifierPricePerUnit)) × quantity`. El precio de los modificadores se acumula por unidad y se multiplica por la cantidad — no se suman al total de la orden por separado. `OrderItemModifierRequest` requiere `modifierId` (Long) y `price` (BigDecimal); el servicio resuelve `modifierName` y `groupName` del catálogo.
 
 ---
 
@@ -346,15 +366,16 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 ### Gastos
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/expense-categories`
-- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/expenses` (paginado — `?page=0&size=20&sort=expenseDate,desc`)
+- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/expenses` (paginado — `?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` opcionales; sin filtro devuelve todos)
+- `PATCH               /api/v1/restaurants/{restaurantId}/expenses/{id}/paid` — body `{ "isPaid": true }` · requiere ADMIN o MANAGER (`@PreAuthorize`)
 
 ### Ingresos
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/income-categories`
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/incomes` (paginado — `?page=0&size=20&sort=incomeDate,desc`)
 
 ### Ventas
-- `GET/POST/DELETE     /api/v1/restaurants/{restaurantId}/sales` (paginado)
-- `GET                 /api/v1/restaurants/{restaurantId}/sales/by-source`
+- `GET/POST/DELETE     /api/v1/restaurants/{restaurantId}/sales` (paginado — `?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` opcionales)
+- `GET                 /api/v1/restaurants/{restaurantId}/sales/by-source` (`?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD` opcionales)
 
 ### Fuentes de venta
 - `GET/POST/PUT/DELETE /api/v1/sales-sources`
@@ -363,6 +384,12 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 ### Roles de empleado
 - `GET/POST/PUT/DELETE /api/v1/employee-roles`
 - `GET                 /api/v1/employee-roles/{id}`
+
+### Modificadores
+- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/modifier-groups`
+- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers`
+- `GET/POST            /api/v1/menu-item-variants/{variantId}/modifiers`
+- `DELETE              /api/v1/menu-item-variants/{variantId}/modifiers/{modifierId}`
 
 ### Combos
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/combos`
@@ -394,7 +421,7 @@ La configuración está dividida en perfiles. El perfil `dev` es el predetermina
 |---|---|---|
 | `application.properties` | base | Config compartida: nombre, puerto, driver, `ddl-auto` |
 | `application-dev.properties` | `dev` | Desarrollo local — importa `env.properties` |
-| `application-prod.properties` | `prod` | Producción — ⏳ pendiente (placeholders con env vars) |
+| `application-prod.properties` | `prod` | Producción — env vars (`${DB_HOST}`, `${JWT_SECRET}`, etc.) |
 | `application-test.properties` | `test` | Tests — H2 en memoria |
 
 ```bash
@@ -434,6 +461,10 @@ Scripts en `src/main/resources/db/`:
 - `V4__expense_category_isactive.sql` — agrega `is_active TINYINT(1) NOT NULL DEFAULT 1` a `expense_categories`
 - `V5__combos_and_promotions.sql` — crea `combos`, `combo_items`, `promotions`, `promotion_items`
 - `V6__sale_cash_session.sql` — agrega `cash_session_id BIGINT NULL FK` a `sales`
+- `V7__sale_customer.sql` — agrega `customer_id BIGINT NULL FK` a `sales`
+- `V8__order_preparation_times.sql` — agrega `preparing_at DATETIME NULL`, `ready_at DATETIME NULL`, `preparation_time_seconds INT NULL` a `orders`
+- `V9__expense_is_paid.sql` — agrega `is_paid BOOLEAN NOT NULL DEFAULT FALSE` a `expenses`
+- `V10__modifier_groups.sql` — crea `modifier_groups`, `modifiers`, `variant_modifiers`, `order_item_modifiers`
 
 Para aplicar manualmente:
 ```bash
@@ -442,6 +473,10 @@ mysql -u root -p nortcali < src/main/resources/db/V3__employee_roles.sql
 mysql -u root -p nortcali < src/main/resources/db/V4__expense_category_isactive.sql
 mysql -u root -p nortcali < src/main/resources/db/V5__combos_and_promotions.sql
 mysql -u root -p nortcali < src/main/resources/db/V6__sale_cash_session.sql
+mysql -u root -p nortcali < src/main/resources/db/V7__sale_customer.sql
+mysql -u root -p nortcali < src/main/resources/db/V8__order_preparation_times.sql
+mysql -u root -p nortcali < src/main/resources/db/V9__expense_is_paid.sql
+mysql -u root -p nortcali < src/main/resources/db/V10__modifier_groups.sql
 ```
 
 Al agregar nuevas entidades: crear `V{N}__descripcion.sql` con los `ALTER TABLE` o `CREATE TABLE` necesarios y ejecutarlo **antes** de arrancar la app (Hibernate fallará en `validate` si las tablas no existen).
@@ -492,3 +527,4 @@ Los scripts SQL de `src/main/resources/db/` se ejecutan automáticamente al crea
 - ❌ Usar `System.out.println` — solo `@Slf4j`
 - ❌ Dejar `TODO` sin implementar en código entregado
 - ❌ Usar Lombok (`@Data`, `@Builder`, etc.) en entidades JPA — las entidades usan getters/setters manuales
+- ❌ Usar o extender `OrderItemExtra` / `order_item_extras` — código muerto reemplazado por el sistema de modificadores

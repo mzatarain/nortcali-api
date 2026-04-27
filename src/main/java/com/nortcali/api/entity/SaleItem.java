@@ -13,6 +13,9 @@ public class SaleItem {
     @Column(nullable = false)
     private Integer quantity;
 
+    @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal unitPrice;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
@@ -35,6 +38,9 @@ public class SaleItem {
 
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
+
+    public BigDecimal getUnitPrice() { return unitPrice; }
+    public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
 
     public BigDecimal getSubtotal() { return subtotal; }
     public void setSubtotal(BigDecimal subtotal) { this.subtotal = subtotal; }

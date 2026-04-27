@@ -24,7 +24,7 @@ public class OrderItemRequest {
     private BigDecimal unitPrice;
 
     @Valid
-    private List<OrderItemExtraRequest> extras;
+    private List<OrderItemModifierRequest> modifiers;
 
     public Long getMenuItemId() { return menuItemId; }
     public void setMenuItemId(Long menuItemId) { this.menuItemId = menuItemId; }
@@ -38,6 +38,6 @@ public class OrderItemRequest {
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
 
-    public List<OrderItemExtraRequest> getExtras() { return extras; }
-    public void setExtras(List<OrderItemExtraRequest> extras) { this.extras = extras; }
+    public List<OrderItemModifierRequest> getModifiers() { return modifiers; }
+    public void setModifiers(List<OrderItemModifierRequest> modifiers) { this.modifiers = modifiers; }
 }

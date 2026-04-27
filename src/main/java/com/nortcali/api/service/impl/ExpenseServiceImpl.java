@@ -1,6 +1,7 @@
 package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.ExpenseCategoryRequest;
+import com.nortcali.api.dto.request.ExpensePaidRequest;
 import com.nortcali.api.dto.request.ExpenseRequest;
 import com.nortcali.api.dto.response.ExpenseCategoryResponse;
 import com.nortcali.api.dto.response.ExpenseResponse;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -72,7 +74,19 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     @Override @Transactional(readOnly = true)
-    public Page<ExpenseResponse> getByRestaurant(Long restaurantId, Pageable pageable) {
+    public Page<ExpenseResponse> getByRestaurant(Long restaurantId, LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        if (startDate != null && endDate != null) {
+            return expenseRepo.findByRestaurantIdAndExpenseDateBetweenAndIsActiveTrueOrderByExpenseDateDesc(
+                    restaurantId, startDate, endDate, pageable).map(mapper::toResponse);
+        }
+        if (startDate != null) {
+            return expenseRepo.findByRestaurantIdAndExpenseDateBetweenAndIsActiveTrueOrderByExpenseDateDesc(
+                    restaurantId, startDate, LocalDate.of(9999, 12, 31), pageable).map(mapper::toResponse);
+        }
+        if (endDate != null) {
+            return expenseRepo.findByRestaurantIdAndExpenseDateBetweenAndIsActiveTrueOrderByExpenseDateDesc(
+                    restaurantId, LocalDate.of(1970, 1, 1), endDate, pageable).map(mapper::toResponse);
+        }
         return expenseRepo.findByRestaurantIdAndIsActiveTrueOrderByExpenseDateDesc(restaurantId, pageable)
                 .map(mapper::toResponse);
     }
@@ -95,6 +109,7 @@ public class ExpenseServiceImpl implements ExpenseService {
         entity.setRestaurant(restaurantRepo.getReferenceById(restaurantId));
         entity.setCategory(category);
         entity.setEmployee(employee);
+        entity.setPaid(request.getIsPaid() != null && request.getIsPaid());
         return mapper.toResponse(expenseRepo.save(entity));
     }
 
@@ -108,6 +123,16 @@ public class ExpenseServiceImpl implements ExpenseService {
         mapper.updateEntity(request, entity);
         entity.setCategory(category);
         entity.setEmployee(employee);
+        entity.setPaid(request.getIsPaid() != null && request.getIsPaid());
+        return mapper.toResponse(expenseRepo.save(entity));
+    }
+
+    @Override
+    public ExpenseResponse updatePaidStatus(Long restaurantId, Long expenseId, ExpensePaidRequest request) {
+        log.info("updatePaidStatus called - restaurantId={}, expenseId={}", restaurantId, expenseId);
+        Expense entity = expenseRepo.findByIdAndRestaurantId(expenseId, restaurantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Expense", expenseId));
+        entity.setPaid(request.getIsPaid());
         return mapper.toResponse(expenseRepo.save(entity));
     }
 

@@ -621,7 +621,7 @@ interface DeliveryDriverResponse {
 ### Órdenes
 
 ```
-GET  /api/v1/restaurants/{restaurantId}/orders          — paginado, ?status=pending (opcional)
+GET  /api/v1/restaurants/{restaurantId}/orders          — paginado, ?status=confirmed&date=YYYY-MM-DD (opcionales)
 POST /api/v1/restaurants/{restaurantId}/orders
 GET  /api/v1/restaurants/{restaurantId}/orders/{id}
 PUT  /api/v1/orders/{id}/status
@@ -629,18 +629,20 @@ GET  /api/v1/orders/{id}/history
 POST /api/v1/orders/{id}/payments
 ```
 
+> Las órdenes nacen en estado `confirmed`. El inventario se descuenta al crear la orden.
+
 ```typescript
-interface OrderItemExtraRequest {
-  menuItemId: number;   // requerido
-  unitPrice: string;    // requerido, >= 0
+interface OrderItemModifierRequest {
+  modifierId: number;   // requerido — id del catálogo de modificadores
+  price: string;        // requerido, >= 0
 }
 
 interface OrderItemRequest {
-  menuItemId: number;                     // requerido
+  menuItemId: number;                        // requerido
   variantId?: number;
-  quantity: number;                       // requerido, >= 1
-  unitPrice: string;                      // requerido, >= 0
-  extras?: OrderItemExtraRequest[];
+  quantity: number;                          // requerido, >= 1
+  unitPrice: string;                         // requerido, >= 0
+  modifiers?: OrderItemModifierRequest[];
 }
 
 interface OrderRequest {
@@ -667,11 +669,12 @@ interface PaymentRequest {
 
 // ─── Responses ────────────────────────────────────────────────────────
 
-interface OrderItemExtraResponse {
+interface OrderItemModifierResponse {
   id: number;
-  menuItemId: number;
-  menuItemName: string;
-  unitPrice: string;
+  modifierId: number;
+  modifierName: string;
+  groupName: string;
+  price: string;
 }
 
 interface OrderItemResponse {
@@ -682,14 +685,14 @@ interface OrderItemResponse {
   variantName: string | null;
   quantity: number;
   unitPrice: string;
-  subtotal: string;
-  extras: OrderItemExtraResponse[];
+  subtotal: string;           // (unitPrice + sum(modifier.price)) × quantity
+  modifiers: OrderItemModifierResponse[];
 }
 
 interface OrderResponse {
   id: number;
   restaurantId: number;
-  folio: string;             // "ORD-1-20260416-0001"
+  folio: string;                    // "ORD-1-20260416-0001"
   orderType: string;
   source: string;
   status: string;
@@ -701,7 +704,10 @@ interface OrderResponse {
   employeeUsername: string;
   driverId: number | null;
   driverFirstName: string | null;
-  createdAt: string;         // "YYYY-MM-DDTHH:mm:ss"
+  createdAt: string;                // "YYYY-MM-DDTHH:mm:ss" UTC
+  preparingAt: string | null;       // UTC — se registra al transicionar a PREPARING
+  readyAt: string | null;           // UTC — se registra al transicionar a READY
+  preparationTimeSeconds: number | null;  // null si no pasó por PREPARING
   items: OrderItemResponse[];
 }
 
@@ -734,10 +740,11 @@ POST   /api/v1/restaurants/{restaurantId}/expense-categories
 PUT    /api/v1/restaurants/{restaurantId}/expense-categories/{id}
 DELETE /api/v1/restaurants/{restaurantId}/expense-categories/{id}
 
-GET    /api/v1/restaurants/{restaurantId}/expenses   — paginado: ?page=0&size=20&sort=expenseDate,desc
+GET    /api/v1/restaurants/{restaurantId}/expenses   — paginado: ?page=0&size=20&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 POST   /api/v1/restaurants/{restaurantId}/expenses
 PUT    /api/v1/restaurants/{restaurantId}/expenses/{id}
 DELETE /api/v1/restaurants/{restaurantId}/expenses/{id}
+PATCH  /api/v1/restaurants/{restaurantId}/expenses/{id}/paid   — 🏢 ADMIN o MANAGER
 ```
 
 ```typescript
@@ -760,7 +767,13 @@ interface ExpenseRequest {
   expenseDate: string;   // requerido: "YYYY-MM-DD"
   categoryId: number;    // requerido
   employeeId: number;    // requerido
+  isPaid?: boolean;      // opcional — default false
   isActive?: boolean;
+}
+
+// Para marcar como pagado/no pagado (PATCH /expenses/{id}/paid):
+interface ExpensePaidRequest {
+  isPaid: boolean;   // requerido
 }
 
 interface ExpenseResponse {
@@ -773,6 +786,7 @@ interface ExpenseResponse {
   expenseDate: string;   // "YYYY-MM-DD"
   employeeId: number;
   isActive: boolean;
+  isPaid: boolean;
 }
 ```
 
@@ -833,10 +847,10 @@ interface IncomeResponse {
 ### Ventas
 
 ```
-GET    /api/v1/restaurants/{restaurantId}/sales           — paginado
+GET    /api/v1/restaurants/{restaurantId}/sales           — paginado: ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 POST   /api/v1/restaurants/{restaurantId}/sales
 DELETE /api/v1/restaurants/{restaurantId}/sales/{id}
-GET    /api/v1/restaurants/{restaurantId}/sales/by-source
+GET    /api/v1/restaurants/{restaurantId}/sales/by-source — ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 ```
 
 ```typescript
@@ -851,6 +865,8 @@ interface SaleRequest {
   sourceId: number;              // requerido — id de SalesSource
   saleDate: string;              // requerido: "YYYY-MM-DD"
   employeeId: number;            // requerido
+  paymentMethod?: PaymentMethod; // opcional
+  notes?: string;                // opcional
   items: SaleItemRequest[];      // requerido, mínimo 1
 }
 
@@ -869,11 +885,12 @@ interface SaleResponse {
   restaurantId: number;
   sourceId: number;
   sourceName: string;
-  folio: string;
+  folio: string;              // "VTA-{restaurantId}-{yyyyMMdd}-{seq4}" (manual) o folio de la orden (auto)
   total: string;
-  commission: string;     // calculada automáticamente: total * commissionPct / 100
+  commission: string;         // calculada automáticamente: total * commissionPct / 100
   saleDate: string;
   employeeId: number;
+  customerName: string | null;
   isActive: boolean;
   items: SaleItemResponse[];
 }
@@ -1012,6 +1029,70 @@ interface PromotionResponse {
 ```
 
 El `PUT` reemplaza la lista `items` completamente. El `DELETE` hace soft-delete (`isActive = false`).
+
+---
+
+### Modificadores
+
+Los modificadores son personalizaciones opcionales para variantes de platillo (e.g. "Extra queso — $15"). El catálogo se organiza en grupos.
+
+```
+GET    /api/v1/restaurants/{restaurantId}/modifier-groups
+POST   /api/v1/restaurants/{restaurantId}/modifier-groups
+PUT    /api/v1/restaurants/{restaurantId}/modifier-groups/{id}
+DELETE /api/v1/restaurants/{restaurantId}/modifier-groups/{id}
+
+GET    /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers
+POST   /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers
+PUT    /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers/{id}
+DELETE /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers/{id}
+
+GET    /api/v1/menu-item-variants/{variantId}/modifiers   — modificadores disponibles con precio para la variante
+POST   /api/v1/menu-item-variants/{variantId}/modifiers
+DELETE /api/v1/menu-item-variants/{variantId}/modifiers/{modifierId}
+```
+
+```typescript
+// Catálogo
+interface ModifierGroupRequest {
+  name: string;   // requerido, max 100
+}
+
+interface ModifierGroupResponse {
+  id: number;
+  restaurantId: number;
+  name: string;
+  isActive: boolean;
+}
+
+interface ModifierRequest {
+  name: string;   // requerido, max 100
+}
+
+interface ModifierResponse {
+  id: number;
+  groupId: number;
+  groupName: string;
+  name: string;
+  isActive: boolean;
+}
+
+// Precio por variante
+interface VariantModifierRequest {
+  modifierId: number;   // requerido — id del catálogo
+  price: string;        // requerido, >= 0
+}
+
+interface VariantModifierResponse {
+  modifierId: number;
+  modifierName: string;
+  groupId: number;
+  groupName: string;
+  price: string;
+}
+```
+
+> Al crear una orden, los modificadores se envían por ítem usando `OrderItemModifierRequest` (ver sección Órdenes). El precio en el ítem es el precio acordado al momento del pedido — puede diferir del precio base en `VariantModifier`.
 
 ---
 
@@ -1192,21 +1273,20 @@ type PeriodType = 'daily' | 'weekly' | 'monthly';
 
 ### 6.1 Flujo de estados de una orden
 
-Las transiciones válidas son estrictas. El backend rechaza con `422` cualquier salto no permitido.
+Las órdenes nacen en `confirmed` — no en `pending`. El inventario se descuenta al crear la orden. Al llegar a `delivered`, el backend crea automáticamente una venta. Las transiciones son estrictas: el backend rechaza con `422` cualquier salto no permitido.
 
 ```
-PENDING ──→ CONFIRMED ──→ PREPARING ──→ READY ──→ DELIVERED
-   │              │              │           │
-   └──────────────┴──────────────┴───────────┴──→ CANCELLED
+CONFIRMED ──→ PREPARING ──→ READY ──→ DELIVERED
+    │               │           │
+    └───────────────┴───────────┴──→ CANCELLED
 ```
 
 | Estado actual | Transiciones permitidas |
 |---------------|-------------------------|
-| `pending` | `confirmed`, `cancelled` |
 | `confirmed` | `preparing`, `cancelled` |
 | `preparing` | `ready`, `cancelled` |
 | `ready` | `delivered`, `cancelled` |
-| `delivered` | — (estado final) |
+| `delivered` | — (estado final, genera venta automáticamente) |
 | `cancelled` | — (estado final) |
 
 `delivered` y `cancelled` son estados finales: no se pueden cambiar una vez alcanzados.
@@ -1228,6 +1308,8 @@ Todos los recursos operativos están aislados por restaurante. Siempre incluir e
 - `employees` (en la creación)
 
 Los catálogos globales **no** tienen `restaurantId`: `units`, `sales-sources`, `employee-roles`, `countries`, `states`, `cities`.
+
+> Los `modifier-groups` y `modifiers` sí están anidados bajo `restaurantId`.
 
 ### 6.3 Reglas de caja
 
