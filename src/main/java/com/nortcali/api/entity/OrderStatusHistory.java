@@ -4,7 +4,6 @@ import com.nortcali.api.entity.converter.OrderStatusConverter;
 import com.nortcali.api.entity.enums.OrderStatus;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "order_status_history")
@@ -34,7 +33,7 @@ public class OrderStatusHistory {
 
     @PrePersist
     void onCreate() {
-        this.changedAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.changedAt = LocalDateTime.now();
     }
 
     public OrderStatusHistory() {}

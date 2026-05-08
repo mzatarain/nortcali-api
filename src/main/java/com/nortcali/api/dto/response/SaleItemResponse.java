@@ -9,5 +9,6 @@ public record SaleItemResponse(
         Long variantId,
         String variantName,
         Integer quantity,
-        BigDecimal subtotal
+        BigDecimal subtotal,
+        String groupLabel
 ) {}

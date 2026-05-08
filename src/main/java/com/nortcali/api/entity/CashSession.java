@@ -5,7 +5,6 @@ import com.nortcali.api.entity.enums.CashSessionStatus;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -64,7 +63,7 @@ public class CashSession {
 
     @PrePersist
     void onCreate() {
-        this.openedAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.openedAt = LocalDateTime.now();
     }
 
     public CashSession() {}

@@ -25,4 +25,6 @@ public interface OrderService {
     List<OrderStatusHistoryResponse> getHistory(Long orderId);
 
     PaymentResponse addPayment(Long orderId, PaymentRequest request);
+
+    void delete(Long restaurantId, Long orderId);
 }

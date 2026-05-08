@@ -27,6 +27,7 @@ clientes, delivery, ventas, gastos e ingresos. Multi-restaurante desde su raíz
 | Testing | JUnit 5 + Mockito · H2 en memoria para tests de integración (`@ActiveProfiles("test")`) |
 | Logging | Logback (`logback-spring.xml`) + `logstash-logback-encoder` 8.0 para JSON en prod |
 | Lombok | Disponible; usado en services (`@Slf4j`). **No usar en entidades** — tienen getters/setters manuales. |
+| Thymeleaf | En `pom.xml` pero **no se usa** — la API es REST puro. Dependencia vestigial; ignorar. |
 
 **Puerto del servidor:** `8082` (configurado en `env.properties` vía `spring.config.import`)
 
@@ -127,13 +128,16 @@ com.nortcali.api
   `@EnableMethodSecurity` activo — se pueden añadir `@PreAuthorize` en controllers/services.
   Los roles vienen de `Employee.role` (String); `EmployeeDetailsService` los convierte a `ROLE_<NOMBRE>`.
 
-- **Validación de sesión en `JwtAuthFilter`:** Además de la firma JWT (jjwt), el filtro consulta `sessions` para verificar `is_active=true` y `expires_at > now()`. Si la sesión es inválida, NO se setea autenticación (no hace `return 401` directo) — Spring Security resuelve 401 para endpoints protegidos y permite el paso a `permitAll` como `/logout`. Las sesiones expiradas se marcan `is_active=false` automáticamente.
+- **Validación de sesión en `JwtAuthFilter`:** Dos caminos distintos:
+  1. **Firma JWT inválida** (jjwt lanza excepción en `getUsername`): el filtro devuelve `401` directamente con `response.setStatus(401); return`.
+  2. **Sesión inválida o expirada** (firma válida pero `is_active=false` o `expires_at < now()`): NO se setea autenticación pero tampoco se retorna directamente — Spring Security resuelve 401 para endpoints protegidos y deja pasar a `permitAll` como `/logout`. Las sesiones expiradas se marcan `is_active=false` automáticamente en este paso.
 - **Paginación:** Los endpoints paginados usan `@ParameterObject @PageableDefault(size=20) Pageable` y devuelven `Page<T>`. Endpoints paginados: `orders`, `sales`, `expenses`, `incomes`.
 - **CORS — métodos permitidos:** `CorsConfig` lista explícitamente los métodos HTTP: `GET, POST, PUT, PATCH, DELETE, OPTIONS`. Al añadir un endpoint con un método nuevo, verificar que esté en esta lista — su ausencia produce 403 en el DispatcherServlet sin ninguna traza en Spring Security (el filtro CORS de Spring MVC corre después del filter chain).
 - **Restricción de rol en sub-recursos:** Para endpoints dentro de `/restaurants/{id}/...` que requieren rol específico, usar `@PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")` en el método del controller en lugar de `requestMatchers` en `SecurityConfig`. Los `requestMatchers` en SecurityConfig solo cubren paths de nivel superior (sin sub-recursos de restaurante).
 - **GET listas incluyen inactivos:** Los endpoints de lista devuelven todos los registros incluyendo `isActive = false`. El filtrado por activos es responsabilidad del consumidor.
 - **Filtros de fecha parciales — fechas centinela:** Cuando un endpoint acepta `startDate` y `endDate` opcionales y el repo solo expone un método `findBy...BetweenOrderBy...`, el service usa fechas centinela para el límite ausente: `LocalDate.of(1970, 1, 1)` si solo hay `endDate`, y `LocalDate.of(9999, 12, 31)` si solo hay `startDate`. Seguir este patrón al agregar filtros de fecha a nuevos servicios (ver `ExpenseServiceImpl.getByRestaurant` y `SaleServiceImpl.getByRestaurant`).
 - **Logging:** `logback-spring.xml` en `src/main/resources/` — el appender activo se selecciona por `<springProfile>`. Dev: consola coloreada. Prod: JSON a stdout + archivo rotativo (`logs/{app}.log`). Test: consola mínima. Los niveles (`logging.level.*`) se controlan desde los `application-{profile}.properties`.
+- **Cadena de modificadores (Modifier chain):** El flujo es `ModifierGroup → Modifier → VariantModifier → OrderItemModifier`. `ModifierGroup` es el catálogo de grupos por restaurante; `Modifier` son las opciones dentro del grupo; `VariantModifier` vincula un `Modifier` a una `MenuItemVariant` con un precio concreto; `OrderItemModifier` es una **snapshot** — copia `modifierName` y `groupName` del catálogo en el momento de crear la orden, por lo que renombrar o borrar el modificador no afecta órdenes históricas. El campo `modifier_id` en `order_item_modifiers` es nullable por este mismo motivo.
 
 ---
 
@@ -144,7 +148,7 @@ com.nortcali.api
 - Toda respuesta en `ResponseEntity<?>`
 - `@ControllerAdvice` → `GlobalExceptionHandler` en `exception/`
 - Logging con `@Slf4j` — nunca `System.out.println`
-- Fechas en UTC internamente (`LocalDateTime.now(ZoneOffset.UTC)`)
+- Fechas en UTC — `LocalDateTime.now()` es seguro porque la JVM se fija en UTC vía `@PostConstruct` en `NortcaliApiApplication`. Jackson y Hibernate también forzados a UTC en `application.properties`. No agregar zona explícita en `now()`.
 - Nombres de clases/métodos/variables en **inglés**; comentarios en **español**
 
 ### Controllers
@@ -263,7 +267,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - **`Employee`**: la entidad usa `@ManyToMany` via `employee_restaurants`. La DB también tiene una columna `restaurant_id` directa en `employees` (datos legacy) — está mapeada como `@Column(name = "restaurant_id") Long restaurantId` y se asigna en `create()` junto con el ManyToMany. Usar siempre `findByRestaurantsId(Long)` para consultar empleados por restaurante.
 - **`customers.total_orders`**: `INT` en DB → mapeado como `Integer` en la entidad.
 - **`customers.last_name`**: `VARCHAR(80)` nullable — ya mapeado en la entidad.
-- **`orders.folio`**: `VARCHAR(20)` en DB. El formato `ORD-{id}-{yyyyMMdd}-{seq}` cabe en 20 chars para IDs de restaurante ≤ 99.
+- **`orders.folio`**: `VARCHAR(40)` en DB y en la entidad (`length = 40`). El formato es `ORD-{restaurantId}-{yyyyMMdd}-{seq4}`.
 - **`sales`**: columnas `subtotal`, `payment_method`, `notes`, `customer_id`, `cash_session_id` — todas mapeadas en la entidad `Sale`. `folio` usa el mismo valor que la orden de origen (auto-creación) o `VTA-{id}-{yyyyMMdd}-{seq4}` (creación manual).
 - **`sale_items.unit_price`**: `DECIMAL NOT NULL` — mapeado en `SaleItem`. En auto-creación se copia de `orderItem.unitPrice`; en creación manual se deriva de `subtotal / quantity`.
 - **`order_item_extras` — código muerto:** La tabla existe en DB (creada en V2) y los archivos `OrderItemExtra.java`, `OrderItemExtraRequest.java`, `OrderItemExtraResponse.java` aún están en el repo, pero ningún servicio ni controller los referencia. Fueron reemplazados por el sistema de modificadores (`order_item_modifiers`). No extender ni usar estos archivos.
@@ -297,7 +301,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 3. **Stock:** Las órdenes nacen en `CONFIRMED` y los insumos se descuentan al crearse (`deductInventory` en `OrderServiceImpl.create()`). Si `currentStock < minimumStock`, `log.warn(...)` (no bloquear)
 4. **Folio de orden:** `FolioGenerator.generateOrderFolio(restaurantId, date, sequence)` → `ORD-{id}-{yyyyMMdd}-{seq4}`. La secuencia se calcula con `countByFolioPrefix` (LIKE en el folio) — NO con COUNT por fecha para evitar problemas de zona horaria con MVCC. `OrderServiceImpl.create()` usa `Isolation.READ_COMMITTED` para evitar snapshots obsoletos en creaciones concurrentes.
 5. **Historial de estado:** Cada cambio de `orders.status` inserta en `order_status_history`. El primer registro va con `fromStatus = null`
-6. **Transiciones de estado:** Solo se permiten las definidas en `OrderServiceImpl.ALLOWED_TRANSITIONS`
+6. **Transiciones de estado:** Solo se permiten las definidas en `OrderServiceImpl.ALLOWED_TRANSITIONS`. El mapa incluye `PENDING → CONFIRMED/CANCELLED` por retrocompatibilidad, pero `PENDING` nunca es el estado inicial de una orden nueva — `create()` siempre asigna `CONFIRMED`.
 7. **Corte de caja:** Solo una `cash_session` con `status = 'open'` por restaurante → lanza `BusinessRuleException`
 8. **Costo de receta:** `calculatedCost = quantity * supply.unitCost` — recalculado en `RecipeServiceImpl` en cada upsert
 9. **Comisión de venta:** `commission = total * commissionPct / 100` con `RoundingMode.HALF_UP`
@@ -528,3 +532,4 @@ Los scripts SQL de `src/main/resources/db/` se ejecutan automáticamente al crea
 - ❌ Dejar `TODO` sin implementar en código entregado
 - ❌ Usar Lombok (`@Data`, `@Builder`, etc.) en entidades JPA — las entidades usan getters/setters manuales
 - ❌ Usar o extender `OrderItemExtra` / `order_item_extras` — código muerto reemplazado por el sistema de modificadores
+- ❌ Editar o consultar `CLAUDE.md.bakup` — es un backup obsoleto en la raíz del repo; puede eliminarse con `rm CLAUDE.md.bakup`

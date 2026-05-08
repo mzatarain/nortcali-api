@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -65,7 +64,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             if (sessionValid) {
                 LocalDateTime expiresAt = session.get().getExpiresAt();
-                if (expiresAt != null && expiresAt.isBefore(LocalDateTime.now(ZoneOffset.UTC))) {
+                if (expiresAt != null && expiresAt.isBefore(LocalDateTime.now())) {
                     // Sesión expirada — invalidar automáticamente y no autenticar
                     var s = session.get();
                     s.setActive(false);

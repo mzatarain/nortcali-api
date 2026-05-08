@@ -21,6 +21,9 @@ public class OrderItem {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal subtotal;
 
+    @Column(name = "group_label", length = 100)
+    private String groupLabel;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
     private Order order;
@@ -58,6 +61,9 @@ public class OrderItem {
 
     public MenuItemVariant getVariant() { return variant; }
     public void setVariant(MenuItemVariant variant) { this.variant = variant; }
+
+    public String getGroupLabel() { return groupLabel; }
+    public void setGroupLabel(String groupLabel) { this.groupLabel = groupLabel; }
 
     public List<OrderItemModifier> getModifiers() { return modifiers; }
     public void setModifiers(List<OrderItemModifier> modifiers) { this.modifiers = modifiers; }

@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Service
 @Transactional
@@ -116,7 +115,7 @@ public class CashSessionServiceImpl implements CashSessionService {
         session.setDifference(totalCounted.subtract(session.getExpectedCash()));
         session.setStatus(CashSessionStatus.CLOSED);
         session.setClosedBy(closedBy);
-        session.setClosedAt(LocalDateTime.now(ZoneOffset.UTC));
+        session.setClosedAt(LocalDateTime.now());
 
         log.info("Cerrando sesión de caja {} para restaurante {}", sessionId, restaurantId);
         return mapper.toResponse(sessionRepo.save(session));

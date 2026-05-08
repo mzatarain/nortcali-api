@@ -9,7 +9,6 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -78,7 +77,7 @@ public class Order {
 
     @PrePersist
     void onCreate() {
-        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.createdAt = LocalDateTime.now();
     }
 
     public Order() {}

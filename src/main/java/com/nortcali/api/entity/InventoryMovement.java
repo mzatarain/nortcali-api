@@ -5,7 +5,6 @@ import com.nortcali.api.entity.enums.MovementType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "inventory_movements")
@@ -34,7 +33,7 @@ public class InventoryMovement {
 
     @PrePersist
     void onCreate() {
-        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.createdAt = LocalDateTime.now();
     }
 
     public InventoryMovement() {}

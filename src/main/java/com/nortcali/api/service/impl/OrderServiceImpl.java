@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -210,7 +209,7 @@ public class OrderServiceImpl implements OrderService {
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(newStatus);
 
-        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        LocalDateTime now = LocalDateTime.now();
         if (newStatus == OrderStatus.PREPARING) {
             order.setPreparingAt(now);
         }
@@ -270,6 +269,18 @@ public class OrderServiceImpl implements OrderService {
         return mapper.toPaymentResponse(paymentRepo.save(payment));
     }
 
+    @Override
+    public void delete(Long restaurantId, Long orderId) {
+        Order order = findOrThrow(orderId);
+        if (!order.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Order", orderId);
+        }
+        // El historial no tiene cascade JPA desde Order — borrar primero
+        historyRepo.deleteByOrderId(orderId);
+        orderRepo.delete(order);
+        log.info("Orden {} eliminada del restaurante {}", order.getFolio(), restaurantId);
+    }
+
     // =====================
     // Métodos privados
     // =====================
@@ -285,6 +296,7 @@ public class OrderServiceImpl implements OrderService {
             item.setMenuItem(menuItem);
             item.setQuantity(dto.getQuantity());
             item.setUnitPrice(dto.getUnitPrice());
+            item.setGroupLabel(dto.getGroupLabel());
 
             if (dto.getVariantId() != null) {
                 item.setVariant(variantRepo.findById(dto.getVariantId())

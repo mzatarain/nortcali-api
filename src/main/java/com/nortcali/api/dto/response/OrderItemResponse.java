@@ -12,5 +12,6 @@ public record OrderItemResponse(
         Integer quantity,
         BigDecimal unitPrice,
         BigDecimal subtotal,
-        List<OrderItemModifierResponse> modifiers
+        List<OrderItemModifierResponse> modifiers,
+        String groupLabel
 ) {}

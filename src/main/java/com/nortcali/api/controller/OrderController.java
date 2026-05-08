@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -64,6 +65,14 @@ public class OrderController {
     @GetMapping("/orders/{id}/history")
     public ResponseEntity<List<OrderStatusHistoryResponse>> getHistory(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getHistory(id));
+    }
+
+    @DeleteMapping("/restaurants/{restaurantId}/orders/{orderId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long restaurantId,
+                                       @PathVariable Long orderId) {
+        orderService.delete(restaurantId, orderId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/orders/{id}/payments")

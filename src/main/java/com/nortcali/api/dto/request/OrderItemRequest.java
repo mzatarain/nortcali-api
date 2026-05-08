@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,6 +24,9 @@ public class OrderItemRequest {
     @DecimalMin(value = "0.0", message = "El precio no puede ser negativo")
     private BigDecimal unitPrice;
 
+    @Size(max = 100)
+    private String groupLabel;
+
     @Valid
     private List<OrderItemModifierRequest> modifiers;
 
@@ -37,6 +41,9 @@ public class OrderItemRequest {
 
     public BigDecimal getUnitPrice() { return unitPrice; }
     public void setUnitPrice(BigDecimal unitPrice) { this.unitPrice = unitPrice; }
+
+    public String getGroupLabel() { return groupLabel; }
+    public void setGroupLabel(String groupLabel) { this.groupLabel = groupLabel; }
 
     public List<OrderItemModifierRequest> getModifiers() { return modifiers; }
     public void setModifiers(List<OrderItemModifierRequest> modifiers) { this.modifiers = modifiers; }

@@ -6,7 +6,6 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,7 +51,7 @@ public class Promotion {
     public Promotion() {}
 
     @PrePersist
-    void prePersist() { this.createdAt = LocalDateTime.now(ZoneOffset.UTC); }
+    void prePersist() { this.createdAt = LocalDateTime.now(); }
 
     public Long getId() { return id; }
 

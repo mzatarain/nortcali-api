@@ -194,18 +194,18 @@ public class SaleServiceImpl implements SaleService {
         BigDecimal total = BigDecimal.ZERO;
         List<SaleItem> saleItems = new ArrayList<>();
         for (var orderItem : order.getItems()) {
-            BigDecimal unitPrice = orderItem.getUnitPrice();
-            BigDecimal subtotal = unitPrice.multiply(BigDecimal.valueOf(orderItem.getQuantity()));
-            SaleItem saleItem = new SaleItem();
-            saleItem.setSale(sale);
-            saleItem.setMenuItem(orderItem.getMenuItem());
-            saleItem.setVariant(orderItem.getVariant());
-            saleItem.setQuantity(orderItem.getQuantity());
-            saleItem.setUnitPrice(unitPrice);
-            saleItem.setSubtotal(subtotal);
-            saleItems.add(saleItem);
-            total = total.add(subtotal);
-        }
+              BigDecimal subtotal = orderItem.getSubtotal(); // incluye modificadores
+              SaleItem saleItem = new SaleItem();
+              saleItem.setSale(sale);
+              saleItem.setMenuItem(orderItem.getMenuItem());
+              saleItem.setVariant(orderItem.getVariant());
+              saleItem.setQuantity(orderItem.getQuantity());
+              saleItem.setUnitPrice(orderItem.getUnitPrice());
+              saleItem.setSubtotal(subtotal);
+              saleItem.setGroupLabel(orderItem.getGroupLabel());
+              saleItems.add(saleItem);
+              total = total.add(subtotal);
+          }
 
         sale.setSubtotal(total);
         sale.setTotal(total);

@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -62,7 +61,7 @@ public class AuthController {
         session.setEmployee(employee);
         session.setIpAddress(httpRequest.getRemoteAddr());
         session.setActive(true);
-        session.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC)
+        session.setExpiresAt(LocalDateTime.now()
                 .plusSeconds(jwtUtil.getExpiration() / 1000));
         sessionRepo.save(session);
 
@@ -114,7 +113,7 @@ public class AuthController {
         newSession.setEmployee(employee);
         newSession.setIpAddress(httpRequest.getRemoteAddr());
         newSession.setActive(true);
-        newSession.setExpiresAt(LocalDateTime.now(ZoneOffset.UTC)
+        newSession.setExpiresAt(LocalDateTime.now()
                 .plusSeconds(jwtUtil.getExpiration() / 1000));
         sessionRepo.save(newSession);
 

@@ -5,7 +5,6 @@ import com.nortcali.api.entity.enums.PaymentMethod;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "payments")
@@ -37,7 +36,7 @@ public class Payment {
 
     @PrePersist
     void onCreate() {
-        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);
+        this.createdAt = LocalDateTime.now();
     }
 
     public Payment() {}
