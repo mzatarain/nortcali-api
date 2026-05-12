@@ -16,5 +16,6 @@ public record SaleResponse(
         Long employeeId,
         String customerName,
         boolean isActive,
+        Long orderId,
         List<SaleItemResponse> items
 ) {}

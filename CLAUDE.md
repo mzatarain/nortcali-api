@@ -268,8 +268,9 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - **`customers.total_orders`**: `INT` en DB → mapeado como `Integer` en la entidad.
 - **`customers.last_name`**: `VARCHAR(80)` nullable — ya mapeado en la entidad.
 - **`orders.folio`**: `VARCHAR(40)` en DB y en la entidad (`length = 40`). El formato es `ORD-{restaurantId}-{yyyyMMdd}-{seq4}`.
-- **`sales`**: columnas `subtotal`, `payment_method`, `notes`, `customer_id`, `cash_session_id` — todas mapeadas en la entidad `Sale`. `folio` usa el mismo valor que la orden de origen (auto-creación) o `VTA-{id}-{yyyyMMdd}-{seq4}` (creación manual).
+- **`sales`**: columnas `subtotal`, `payment_method`, `notes`, `customer_id`, `cash_session_id`, `order_id` — todas mapeadas en la entidad `Sale`. `folio` usa el mismo valor que la orden de origen (auto-creación) o `VTA-{id}-{yyyyMMdd}-{seq4}` (creación manual). `order_id` es nullable y tiene índice UNIQUE — `null` en ventas manuales; apunta a la orden que la generó en ventas auto-creadas. FK con `ON DELETE SET NULL` (la lógica de borrado en cascada la maneja la capa de servicio).
 - **`sale_items.unit_price`**: `DECIMAL NOT NULL` — mapeado en `SaleItem`. En auto-creación se copia de `orderItem.unitPrice`; en creación manual se deriva de `subtotal / quantity`.
+- **`order_items.group_label` / `sale_items.group_label`**: `VARCHAR(100) NULL` — `null` para ítems individuales; contiene el nombre del combo (ej. `"Combo Familiar"`) cuando el ítem proviene de un combo. El frontend lo envía en `OrderItemRequest.groupLabel`; `SaleServiceImpl.createFromOrder` lo propaga automáticamente al crear la venta. No hay FK al catálogo de combos — es un snapshot de texto.
 - **`order_item_extras` — código muerto:** La tabla existe en DB (creada en V2) y los archivos `OrderItemExtra.java`, `OrderItemExtraRequest.java`, `OrderItemExtraResponse.java` aún están en el repo, pero ningún servicio ni controller los referencia. Fueron reemplazados por el sistema de modificadores (`order_item_modifiers`). No extender ni usar estos archivos.
 
 ### Vistas SQL (usar con `nativeQuery = true`)
@@ -312,6 +313,8 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 13. **`totalSales` en sesión de caja abierta:** `CashSessionServiceImpl.getCurrent()` calcula `totalSales` dinámicamente con `saleRepo.sumTotalByCashSessionId(session.getId())` — el campo almacenado en `cash_sessions.total_sales` solo se persiste al cerrar la sesión.
 14. **Tiempo de preparación de orden:** Al transicionar a `PREPARING` se registra `preparingAt = now(UTC)`. Al transicionar a `READY`, si `preparingAt != null`, se calcula `preparationTimeSeconds = ChronoUnit.SECONDS.between(preparingAt, now)` y se guarda `readyAt`. Si la orden pasa a `CANCELLED` tras `PREPARING`, `preparingAt` queda guardado pero `readyAt` y `preparationTimeSeconds` quedan `null`. Si llega a `READY` sin haber pasado por `PREPARING`, `preparationTimeSeconds` queda `null`.
 15. **`isPaid` en gastos:** Los gastos tienen `is_paid BOOLEAN NOT NULL DEFAULT FALSE`. El endpoint `PATCH /restaurants/{restaurantId}/expenses/{id}/paid` (requiere rol `ADMIN` o `MANAGER`) actualiza solo ese campo. En `create` y `update`, `isPaid` es opcional en el request (null se interpreta como false).
+17. **Eliminación de orden (hard-delete):** `orders` no tiene `is_active` — el `DELETE` es físico. `OrderServiceImpl.delete()` elimina en este orden: (1) venta vinculada si existe (`saleService.deleteLinkedSale(orderId)` — hard-delete de la `Sale` y sus `SaleItem` por cascade JPA), (2) `order_status_history` (sin cascade JPA desde `Order`), (3) la orden; JPA cascadea a `order_items`, sus `order_item_modifiers`, y `payments`. Las ventas manuales (`order_id = null`) nunca se ven afectadas.
+
 16. **Subtotal de ítem con modificadores:** `item.subtotal = (unitPrice + sum(modifierPricePerUnit)) × quantity`. El precio de los modificadores se acumula por unidad y se multiplica por la cantidad — no se suman al total de la orden por separado. `OrderItemModifierRequest` requiere `modifierId` (Long) y `price` (BigDecimal); el servicio resuelve `modifierName` y `groupName` del catálogo.
 
 ---
@@ -364,6 +367,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 ### Órdenes
 - `GET/POST            /api/v1/restaurants/{restaurantId}/orders` (paginado; `?status=confirmed&status=preparing` multi-valor; `?date=YYYY-MM-DD` filtro por día)
 - `GET                 /api/v1/restaurants/{restaurantId}/orders/{id}`
+- `DELETE              /api/v1/restaurants/{restaurantId}/orders/{orderId}` — solo ADMIN (`@PreAuthorize`) · 204 No Content
 - `PUT                 /api/v1/orders/{id}/status`
 - `GET                 /api/v1/orders/{id}/history`
 - `POST                /api/v1/orders/{id}/payments`
@@ -469,6 +473,8 @@ Scripts en `src/main/resources/db/`:
 - `V8__order_preparation_times.sql` — agrega `preparing_at DATETIME NULL`, `ready_at DATETIME NULL`, `preparation_time_seconds INT NULL` a `orders`
 - `V9__expense_is_paid.sql` — agrega `is_paid BOOLEAN NOT NULL DEFAULT FALSE` a `expenses`
 - `V10__modifier_groups.sql` — crea `modifier_groups`, `modifiers`, `variant_modifiers`, `order_item_modifiers`
+- `V11__group_label.sql` — agrega `group_label VARCHAR(100) NULL` a `order_items` y `sale_items`
+- `V12__sale_order_id.sql` — agrega `order_id BIGINT NULL UNIQUE` a `sales` con FK a `orders(id) ON DELETE SET NULL`
 
 Para aplicar manualmente:
 ```bash
@@ -481,6 +487,8 @@ mysql -u root -p nortcali < src/main/resources/db/V7__sale_customer.sql
 mysql -u root -p nortcali < src/main/resources/db/V8__order_preparation_times.sql
 mysql -u root -p nortcali < src/main/resources/db/V9__expense_is_paid.sql
 mysql -u root -p nortcali < src/main/resources/db/V10__modifier_groups.sql
+mysql -u root -p nortcali < src/main/resources/db/V11__group_label.sql
+mysql -u root -p nortcali < src/main/resources/db/V12__sale_order_id.sql
 ```
 
 Al agregar nuevas entidades: crear `V{N}__descripcion.sql` con los `ALTER TABLE` o `CREATE TABLE` necesarios y ejecutarlo **antes** de arrancar la app (Hibernate fallará en `validate` si las tablas no existen).

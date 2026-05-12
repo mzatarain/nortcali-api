@@ -8,6 +8,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface SaleService {
 
@@ -22,4 +23,8 @@ public interface SaleService {
     List<SalesBySourceResponse> getSalesBySource(Long restaurantId, LocalDate startDate, LocalDate endDate);
 
     void createFromOrder(Long orderId, Long employeeId);
+
+    Optional<Long> findSaleIdByOrderId(Long orderId);
+
+    void deleteLinkedSale(Long orderId);
 }

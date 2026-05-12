@@ -98,14 +98,14 @@ public class OrderServiceImpl implements OrderService {
         if (date == null) {
             if (parsed.isEmpty()) {
                 return orderRepo.findByRestaurantIdOrderByCreatedAtDesc(restaurantId, pageable)
-                        .map(mapper::toResponse);
+                        .map(this::toOrderResponse);
             }
             if (parsed.size() == 1) {
                 return orderRepo.findByRestaurantIdAndStatusOrderByCreatedAtDesc(restaurantId, parsed.getFirst(), pageable)
-                        .map(mapper::toResponse);
+                        .map(this::toOrderResponse);
             }
             return orderRepo.findByRestaurantIdAndStatusInOrderByCreatedAtDesc(restaurantId, parsed, pageable)
-                    .map(mapper::toResponse);
+                    .map(this::toOrderResponse);
         }
 
         LocalDateTime start = date.atStartOfDay();
@@ -113,20 +113,20 @@ public class OrderServiceImpl implements OrderService {
 
         if (parsed.isEmpty()) {
             return orderRepo.findByRestaurantAndDate(restaurantId, start, end, pageable)
-                    .map(mapper::toResponse);
+                    .map(this::toOrderResponse);
         }
         if (parsed.size() == 1) {
             return orderRepo.findByRestaurantAndStatusAndDate(restaurantId, parsed.getFirst(), start, end, pageable)
-                    .map(mapper::toResponse);
+                    .map(this::toOrderResponse);
         }
         return orderRepo.findByRestaurantAndStatusInAndDate(restaurantId, parsed, start, end, pageable)
-                .map(mapper::toResponse);
+                .map(this::toOrderResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
     public OrderResponse getById(Long id) {
-        return mapper.toResponse(findOrThrow(id));
+        return toOrderResponse(findOrThrow(id));
     }
 
     @Override
@@ -186,7 +186,7 @@ public class OrderServiceImpl implements OrderService {
         deductInventory(saved);
 
         log.info("Orden creada: {} para restaurante {}", saved.getFolio(), restaurantId);
-        return mapper.toResponse(saved);
+        return toOrderResponse(saved);
     }
 
     @Override
@@ -238,7 +238,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         log.info("Orden {} cambió de {} a {}", order.getFolio(), previousStatus, newStatus);
-        return mapper.toResponse(order);
+        return toOrderResponse(order);
     }
 
     @Override
@@ -275,6 +275,7 @@ public class OrderServiceImpl implements OrderService {
         if (!order.getRestaurant().getId().equals(restaurantId)) {
             throw new ResourceNotFoundException("Order", orderId);
         }
+        saleService.deleteLinkedSale(orderId);
         // El historial no tiene cascade JPA desde Order — borrar primero
         historyRepo.deleteByOrderId(orderId);
         orderRepo.delete(order);
@@ -284,6 +285,11 @@ public class OrderServiceImpl implements OrderService {
     // =====================
     // Métodos privados
     // =====================
+
+    private OrderResponse toOrderResponse(Order order) {
+        Long saleId = saleService.findSaleIdByOrderId(order.getId()).orElse(null);
+        return mapper.toResponse(order, saleId);
+    }
 
     private List<OrderItem> buildItems(List<OrderItemRequest> itemRequests, Order order) {
         List<OrderItem> result = new ArrayList<>();

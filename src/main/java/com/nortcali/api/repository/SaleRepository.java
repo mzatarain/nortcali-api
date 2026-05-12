@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface SaleRepository extends JpaRepository<Sale, Long> {
 
@@ -41,4 +42,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     @Query("SELECT COUNT(s) FROM Sale s WHERE s.restaurant.id = :restaurantId AND s.folio LIKE :folioPrefix")
     long countByFolioPrefix(@Param("restaurantId") Long restaurantId, @Param("folioPrefix") String folioPrefix);
+
+    Optional<Sale> findByOrderId(Long orderId);
 }

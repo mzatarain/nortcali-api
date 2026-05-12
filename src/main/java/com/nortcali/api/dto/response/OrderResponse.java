@@ -23,5 +23,6 @@ public record OrderResponse(
         LocalDateTime preparingAt,
         LocalDateTime readyAt,
         Integer preparationTimeSeconds,
-        List<OrderItemResponse> items
+        List<OrderItemResponse> items,
+        Long saleId
 ) {}

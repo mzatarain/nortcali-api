@@ -60,6 +60,9 @@ public class Sale {
     @JoinColumn(name = "cash_session_id")
     private CashSession cashSession;
 
+    @Column(name = "order_id")
+    private Long orderId;
+
     @OneToMany(mappedBy = "sale", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SaleItem> items = new ArrayList<>();
 
@@ -109,4 +112,7 @@ public class Sale {
 
     public List<SaleItem> getItems() { return items; }
     public void setItems(List<SaleItem> items) { this.items = items; }
+
+    public Long getOrderId() { return orderId; }
+    public void setOrderId(Long orderId) { this.orderId = orderId; }
 }

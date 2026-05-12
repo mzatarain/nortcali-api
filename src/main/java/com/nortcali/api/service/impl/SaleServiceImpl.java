@@ -26,6 +26,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional
@@ -217,9 +218,21 @@ public class SaleServiceImpl implements SaleService {
         cashSessionRepo.findByRestaurantIdAndStatus(order.getRestaurant().getId(), CashSessionStatus.OPEN)
                 .ifPresent(sale::setCashSession);
 
+        sale.setOrderId(orderId);
         saleRepo.save(sale);
         log.info("Venta creada automáticamente desde orden {} para restaurante {}",
                 order.getFolio(), order.getRestaurant().getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Long> findSaleIdByOrderId(Long orderId) {
+        return saleRepo.findByOrderId(orderId).map(Sale::getId);
+    }
+
+    @Override
+    public void deleteLinkedSale(Long orderId) {
+        saleRepo.findByOrderId(orderId).ifPresent(saleRepo::delete);
     }
 
     private Sale findOrThrow(Long id) {
