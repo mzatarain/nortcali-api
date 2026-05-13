@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -151,6 +152,7 @@ public class OrderServiceImpl implements OrderService {
         if (request.getPaymentMethod() != null) {
             order.setPaymentMethod(parseEnum(PaymentMethod.class, request.getPaymentMethod(), "payment_method"));
         }
+        order.setNotes(request.getNotes());
 
         // Cliente y repartidor opcionales
         if (request.getCustomerId() != null) {
@@ -172,7 +174,7 @@ public class OrderServiceImpl implements OrderService {
         order.getItems().addAll(items);
 
         // Generar folio: ORD-{restaurantId}-{yyyyMMdd}-{secuencia}
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
         String prefix = FolioGenerator.folioPrefix(restaurantId, today) + "%";
         long sequence = orderRepo.countByFolioPrefix(restaurantId, prefix) + 1;
         order.setFolio(FolioGenerator.generateOrderFolio(restaurantId, today, sequence));
@@ -280,6 +282,36 @@ public class OrderServiceImpl implements OrderService {
         historyRepo.deleteByOrderId(orderId);
         orderRepo.delete(order);
         log.info("Orden {} eliminada del restaurante {}", order.getFolio(), restaurantId);
+    }
+
+    @Override
+    public CloseDayResponse closeDay(Long restaurantId) {
+        LocalDateTime start = LocalDate.now().atStartOfDay();
+        LocalDateTime end = start.plusDays(1);
+
+        List<OrderStatus> activeStatuses = List.of(
+                OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY);
+
+        List<Order> orders = orderRepo.findActiveOrdersForDay(restaurantId, activeStatuses, start, end);
+
+        for (Order order : orders) {
+            OrderStatus previousStatus = order.getStatus();
+            order.setStatus(OrderStatus.DELIVERED);
+            orderRepo.save(order);
+            saveHistory(order, previousStatus, OrderStatus.DELIVERED, order.getEmployee());
+
+            if (saleService.findSaleIdByOrderId(order.getId()).isEmpty()) {
+                try {
+                    saleService.createFromOrder(order.getId(), order.getEmployee().getId());
+                } catch (Exception e) {
+                    log.error("Error en auto-creación de venta para orden {} (close-day): {}",
+                            order.getFolio(), e.getMessage(), e);
+                }
+            }
+        }
+
+        log.info("close-day restaurante {}: {} órdenes cerradas", restaurantId, orders.size());
+        return new CloseDayResponse(orders.size());
     }
 
     // =====================

@@ -16,7 +16,7 @@ clientes, delivery, ventas, gastos e ingresos. Multi-restaurante desde su raíz
 | Componente | Versión / Detalle |
 |------------|-------------------|
 | Lenguaje | Java 21 (target); JVM Maven: 25.0.2; JVM IDE: 21 (`java-21-openjdk`) |
-| Framework | Spring Boot **4.0.5** |
+| Framework | Spring Boot **4.0.6** |
 | ORM | Spring Data JPA + Hibernate 7.x |
 | Base de datos | MySQL 8.4 (local, puerto 3306) |
 | Build | Maven |
@@ -32,6 +32,8 @@ clientes, delivery, ventas, gastos e ingresos. Multi-restaurante desde su raíz
 **Puerto del servidor:** `8082` (configurado en `env.properties` vía `spring.config.import`)
 
 **CORS:** Orígenes permitidos: `http://localhost:5173` (Vite frontend dev) y `http://your-frontend-domain.com`. Configurado en `CorsConfig.java`.
+
+**Scheduling:** `@EnableScheduling` activo en `NortcaliApiApplication`. `EndOfDayScheduler` (en `config/`) corre a las 23:55 todos los días — llama `orderService.closeDay()` por cada restaurante activo. Errores por restaurante se loggean y se continúa con el siguiente.
 
 ---
 
@@ -268,6 +270,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - **`customers.total_orders`**: `INT` en DB → mapeado como `Integer` en la entidad.
 - **`customers.last_name`**: `VARCHAR(80)` nullable — ya mapeado en la entidad.
 - **`orders.folio`**: `VARCHAR(40)` en DB y en la entidad (`length = 40`). El formato es `ORD-{restaurantId}-{yyyyMMdd}-{seq4}`.
+- **`restaurants`**: columna `timezone VARCHAR(50) NOT NULL DEFAULT 'America/Tijuana'` — mapeada en la entidad. Los registros existentes reciben el default al aplicar V13. Se usa en `SaleServiceImpl.createFromOrder()` para derivar la fecha local correcta del negocio al crear ventas auto-generadas.
 - **`sales`**: columnas `subtotal`, `payment_method`, `notes`, `customer_id`, `cash_session_id`, `order_id` — todas mapeadas en la entidad `Sale`. `folio` usa el mismo valor que la orden de origen (auto-creación) o `VTA-{id}-{yyyyMMdd}-{seq4}` (creación manual). `order_id` es nullable y tiene índice UNIQUE — `null` en ventas manuales; apunta a la orden que la generó en ventas auto-creadas. FK con `ON DELETE SET NULL` (la lógica de borrado en cascada la maneja la capa de servicio).
 - **`sale_items.unit_price`**: `DECIMAL NOT NULL` — mapeado en `SaleItem`. En auto-creación se copia de `orderItem.unitPrice`; en creación manual se deriva de `subtotal / quantity`.
 - **`order_items.group_label` / `sale_items.group_label`**: `VARCHAR(100) NULL` — `null` para ítems individuales; contiene el nombre del combo (ej. `"Combo Familiar"`) cuando el ítem proviene de un combo. El frontend lo envía en `OrderItemRequest.groupLabel`; `SaleServiceImpl.createFromOrder` lo propaga automáticamente al crear la venta. No hay FK al catálogo de combos — es un snapshot de texto.
@@ -367,6 +370,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 ### Órdenes
 - `GET/POST            /api/v1/restaurants/{restaurantId}/orders` (paginado; `?status=confirmed&status=preparing` multi-valor; `?date=YYYY-MM-DD` filtro por día)
 - `GET                 /api/v1/restaurants/{restaurantId}/orders/{id}`
+- `POST                /api/v1/restaurants/{restaurantId}/orders/close-day` — CASHIER, MANAGER o ADMIN · cierra en masa todas las órdenes activas del día (confirmed/preparing/ready → delivered) · 200 `{ "closedCount": N }`
 - `DELETE              /api/v1/restaurants/{restaurantId}/orders/{orderId}` — solo ADMIN (`@PreAuthorize`) · 204 No Content
 - `PUT                 /api/v1/orders/{id}/status`
 - `GET                 /api/v1/orders/{id}/history`
@@ -475,6 +479,8 @@ Scripts en `src/main/resources/db/`:
 - `V10__modifier_groups.sql` — crea `modifier_groups`, `modifiers`, `variant_modifiers`, `order_item_modifiers`
 - `V11__group_label.sql` — agrega `group_label VARCHAR(100) NULL` a `order_items` y `sale_items`
 - `V12__sale_order_id.sql` — agrega `order_id BIGINT NULL UNIQUE` a `sales` con FK a `orders(id) ON DELETE SET NULL`
+- `V13__restaurant_timezone.sql` — agrega `timezone VARCHAR(50) NOT NULL DEFAULT 'America/Tijuana'` a `restaurants`
+- `V14__order_notes.sql` — agrega `notes TEXT NULL` a `orders` para notas o solicitudes especiales del cliente
 
 Para aplicar manualmente:
 ```bash
@@ -489,6 +495,8 @@ mysql -u root -p nortcali < src/main/resources/db/V9__expense_is_paid.sql
 mysql -u root -p nortcali < src/main/resources/db/V10__modifier_groups.sql
 mysql -u root -p nortcali < src/main/resources/db/V11__group_label.sql
 mysql -u root -p nortcali < src/main/resources/db/V12__sale_order_id.sql
+mysql -u root -p nortcali < src/main/resources/db/V13__restaurant_timezone.sql
+mysql -u root -p nortcali < src/main/resources/db/V14__order_notes.sql
 ```
 
 Al agregar nuevas entidades: crear `V{N}__descripcion.sql` con los `ALTER TABLE` o `CREATE TABLE` necesarios y ejecutarlo **antes** de arrancar la app (Hibernate fallará en `validate` si las tablas no existen).

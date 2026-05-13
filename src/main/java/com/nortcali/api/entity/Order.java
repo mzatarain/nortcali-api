@@ -41,6 +41,9 @@ public class Order {
     @Column(name = "payment_method", length = 25)
     private PaymentMethod paymentMethod;
 
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -102,6 +105,9 @@ public class Order {
 
     public PaymentMethod getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(PaymentMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
 

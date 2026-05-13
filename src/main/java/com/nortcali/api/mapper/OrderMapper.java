@@ -27,7 +27,7 @@ public interface OrderMapper {
         return new OrderResponse(r.id(), r.restaurantId(), r.folio(), r.orderType(), r.source(),
                 r.status(), r.total(), r.paymentMethod(), r.customerId(), r.customerFirstName(),
                 r.employeeId(), r.employeeUsername(), r.driverId(), r.driverFirstName(),
-                r.createdAt(), r.preparingAt(), r.readyAt(), r.preparationTimeSeconds(), r.items(), saleId);
+                r.createdAt(), r.preparingAt(), r.readyAt(), r.preparationTimeSeconds(), r.items(), saleId, r.notes());
     }
 
     @Mapping(source = "menuItem.id", target = "menuItemId")

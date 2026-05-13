@@ -3,6 +3,7 @@ package com.nortcali.api.controller;
 import com.nortcali.api.dto.request.OrderRequest;
 import com.nortcali.api.dto.request.OrderStatusUpdateRequest;
 import com.nortcali.api.dto.request.PaymentRequest;
+import com.nortcali.api.dto.response.CloseDayResponse;
 import com.nortcali.api.dto.response.OrderResponse;
 import com.nortcali.api.dto.response.OrderStatusHistoryResponse;
 import com.nortcali.api.dto.response.PaymentResponse;
@@ -65,6 +66,12 @@ public class OrderController {
     @GetMapping("/orders/{id}/history")
     public ResponseEntity<List<OrderStatusHistoryResponse>> getHistory(@PathVariable Long id) {
         return ResponseEntity.ok(orderService.getHistory(id));
+    }
+
+    @PostMapping("/restaurants/{restaurantId}/orders/close-day")
+    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'ADMIN')")
+    public ResponseEntity<CloseDayResponse> closeDay(@PathVariable Long restaurantId) {
+        return ResponseEntity.ok(orderService.closeDay(restaurantId));
     }
 
     @DeleteMapping("/restaurants/{restaurantId}/orders/{orderId}")

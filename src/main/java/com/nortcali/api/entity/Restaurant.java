@@ -32,6 +32,12 @@ public class Restaurant {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Column(nullable = false, length = 50)
+    private String timezone = "America/Tijuana";
+
+    @Column(name = "clabe_account", length = 18)
+    private String clabeAccount;
+
 
     /* =========================
        RELATIONS
@@ -110,8 +116,14 @@ public class Restaurant {
     public City getCity() {
     	return city;
     }
-    
+
     public void setCity(City city) {
     	this.city = city;
     }
+
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
+
+    public String getClabeAccount() { return clabeAccount; }
+    public void setClabeAccount(String clabeAccount) { this.clabeAccount = clabeAccount; }
 }

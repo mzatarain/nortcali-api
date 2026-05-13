@@ -7,6 +7,8 @@ public record RestaurantResponse(
         String whatsapp,
         String addressLine,
         boolean isActive,
+        String timezone,
+        String clabeAccount,
         Long cityId,
         String cityName
 ) {}

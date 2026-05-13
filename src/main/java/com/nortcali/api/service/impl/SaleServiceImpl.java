@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -187,7 +188,7 @@ public class SaleServiceImpl implements SaleService {
         sale.setRestaurant(order.getRestaurant());
         sale.setSource(source);
         sale.setEmployee(employee);
-        sale.setSaleDate(LocalDate.now());
+        sale.setSaleDate(LocalDate.now(ZoneId.of(order.getRestaurant().getTimezone())));
         sale.setFolio(order.getFolio());
         sale.setPaymentMethod(order.getPaymentMethod());
         sale.setCustomer(order.getCustomer());

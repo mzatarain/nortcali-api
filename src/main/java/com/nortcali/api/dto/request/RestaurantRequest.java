@@ -24,6 +24,12 @@ public class RestaurantRequest {
 
     private boolean isActive = true;
 
+    @Size(max = 50)
+    private String timezone;
+
+    @Size(max = 18)
+    private String clabeAccount;
+
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
@@ -41,4 +47,10 @@ public class RestaurantRequest {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { this.isActive = active; }
+
+    public String getTimezone() { return timezone; }
+    public void setTimezone(String timezone) { this.timezone = timezone; }
+
+    public String getClabeAccount() { return clabeAccount; }
+    public void setClabeAccount(String clabeAccount) { this.clabeAccount = clabeAccount; }
 }

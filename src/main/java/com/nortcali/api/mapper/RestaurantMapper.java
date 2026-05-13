@@ -6,6 +6,7 @@ import com.nortcali.api.entity.Restaurant;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring")
 public interface RestaurantMapper {
@@ -17,9 +18,12 @@ public interface RestaurantMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "city", ignore = true)
+    @Mapping(target = "timezone",
+             expression = "java(request.getTimezone() != null ? request.getTimezone() : \"America/Tijuana\")")
     Restaurant toEntity(RestaurantRequest request);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "city", ignore = true)
+    @Mapping(target = "timezone", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntity(RestaurantRequest request, @MappingTarget Restaurant entity);
 }

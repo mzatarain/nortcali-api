@@ -3,6 +3,7 @@ package com.nortcali.api.service;
 import com.nortcali.api.dto.request.OrderRequest;
 import com.nortcali.api.dto.request.OrderStatusUpdateRequest;
 import com.nortcali.api.dto.request.PaymentRequest;
+import com.nortcali.api.dto.response.CloseDayResponse;
 import com.nortcali.api.dto.response.OrderResponse;
 import com.nortcali.api.dto.response.OrderStatusHistoryResponse;
 import com.nortcali.api.dto.response.PaymentResponse;
@@ -27,4 +28,6 @@ public interface OrderService {
     PaymentResponse addPayment(Long orderId, PaymentRequest request);
 
     void delete(Long restaurantId, Long orderId);
+
+    CloseDayResponse closeDay(Long restaurantId);
 }

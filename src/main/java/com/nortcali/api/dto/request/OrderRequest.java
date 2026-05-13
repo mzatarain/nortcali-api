@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
@@ -23,6 +24,9 @@ public class OrderRequest {
     private Long employeeId;
 
     private String paymentMethod;
+
+    @Size(max = 1000, message = "Las notas no pueden superar los 1000 caracteres")
+    private String notes;
 
     @NotEmpty(message = "La orden debe tener al menos un ítem")
     @Valid
@@ -45,6 +49,9 @@ public class OrderRequest {
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 
     public List<OrderItemRequest> getItems() { return items; }
     public void setItems(List<OrderItemRequest> items) { this.items = items; }
