@@ -17,10 +17,12 @@ public interface CustomerMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "restaurant", ignore = true)
     @Mapping(target = "totalOrders", ignore = true)
+    @Mapping(target = "lastName", ignore = true)
     Customer toEntity(CustomerRequest request);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "restaurant", ignore = true)
     @Mapping(target = "totalOrders", ignore = true)
+    @Mapping(target = "lastName", ignore = true)
     void updateEntity(CustomerRequest request, @MappingTarget Customer entity);
 }

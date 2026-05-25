@@ -7,6 +7,7 @@ import com.nortcali.api.entity.Order;
 import com.nortcali.api.entity.Sale;
 import com.nortcali.api.entity.SaleItem;
 import com.nortcali.api.entity.enums.CashSessionStatus;
+import com.nortcali.api.entity.enums.OrderSource;
 import com.nortcali.api.entity.enums.PaymentMethod;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
@@ -174,7 +175,7 @@ public class SaleServiceImpl implements SaleService {
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
-        String sourceName = order.getSource().name().toLowerCase();
+        String sourceName = toSalesSourceName(order.getSource());
         var source = sourceRepo.findByNameIgnoreCaseAndIsActiveTrue(sourceName)
                 .or(() -> sourceRepo.findByNameIgnoreCaseAndIsActiveTrue("pos"))
                 .or(() -> sourceRepo.findFirstByIsActiveTrueOrderByIdAsc())
@@ -234,6 +235,16 @@ public class SaleServiceImpl implements SaleService {
     @Override
     public void deleteLinkedSale(Long orderId) {
         saleRepo.findByOrderId(orderId).ifPresent(saleRepo::delete);
+    }
+
+    private static String toSalesSourceName(OrderSource source) {
+        return switch (source) {
+            case PHONE -> "Teléfono";
+            case WHATSAPP -> "WhatsApp";
+            case RAPPI -> "Rappi";
+            case UBER_EATS -> "Uber Eats";
+            default -> source.name().toLowerCase();
+        };
     }
 
     private Sale findOrThrow(Long id) {

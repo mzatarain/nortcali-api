@@ -13,7 +13,11 @@ public interface EmployeeRoleMapper {
     @Mapping(source = "active", target = "isActive")
     EmployeeRoleResponse toResponse(EmployeeRole entity);
 
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "active", ignore = true)
     EmployeeRole toEntity(EmployeeRoleRequest request);
 
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "active", ignore = true)
     void updateEntity(EmployeeRoleRequest request, @MappingTarget EmployeeRole entity);
 }
