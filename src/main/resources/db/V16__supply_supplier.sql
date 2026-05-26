@@ -1,0 +1,1 @@
+ALTER TABLE supplies ADD COLUMN supplier VARCHAR(150) NULL;

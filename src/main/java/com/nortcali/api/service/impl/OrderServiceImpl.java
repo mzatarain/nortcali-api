@@ -153,6 +153,9 @@ public class OrderServiceImpl implements OrderService {
             order.setPaymentMethod(parseEnum(PaymentMethod.class, request.getPaymentMethod(), "payment_method"));
         }
         order.setNotes(request.getNotes());
+        if (request.getCreatedAt() != null) {
+            order.setCreatedAt(request.getCreatedAt());
+        }
 
         // Cliente y repartidor opcionales
         if (request.getCustomerId() != null) {

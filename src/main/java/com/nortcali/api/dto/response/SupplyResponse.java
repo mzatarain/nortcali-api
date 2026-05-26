@@ -6,6 +6,7 @@ public record SupplyResponse(
         Long id,
         Long restaurantId,
         String name,
+        String supplier,
         Long unitId,
         String unitName,
         String unitAbbreviation,

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class OrderRequest {
@@ -27,6 +28,8 @@ public class OrderRequest {
 
     @Size(max = 1000, message = "Las notas no pueden superar los 1000 caracteres")
     private String notes;
+
+    private LocalDateTime createdAt;
 
     @NotEmpty(message = "La orden debe tener al menos un ítem")
     @Valid
@@ -55,4 +58,7 @@ public class OrderRequest {
 
     public List<OrderItemRequest> getItems() { return items; }
     public void setItems(List<OrderItemRequest> items) { this.items = items; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

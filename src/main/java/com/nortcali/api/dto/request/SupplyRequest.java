@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.lang.Nullable;
 
 import java.math.BigDecimal;
 
@@ -12,6 +13,10 @@ public class SupplyRequest {
     @NotBlank(message = "El nombre del insumo es obligatorio")
     @Size(max = 100, message = "El nombre no puede superar los 100 caracteres")
     private String name;
+
+    @Nullable
+    @Size(max = 150, message = "El proveedor no puede superar los 150 caracteres")
+    private String supplier;
 
     @NotNull(message = "La unidad de medida es obligatoria")
     private Long unitId;
@@ -32,6 +37,9 @@ public class SupplyRequest {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getSupplier() { return supplier; }
+    public void setSupplier(String supplier) { this.supplier = supplier; }
 
     public Long getUnitId() { return unitId; }
     public void setUnitId(Long unitId) { this.unitId = unitId; }

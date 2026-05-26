@@ -13,6 +13,9 @@ public class Supply {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(length = 150)
+    private String supplier;
+
     @Column(name = "current_stock", nullable = false, precision = 12, scale = 4)
     private BigDecimal currentStock = BigDecimal.ZERO;
 
@@ -40,6 +43,9 @@ public class Supply {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getSupplier() { return supplier; }
+    public void setSupplier(String supplier) { this.supplier = supplier; }
 
     public BigDecimal getCurrentStock() { return currentStock; }
     public void setCurrentStock(BigDecimal currentStock) { this.currentStock = currentStock; }
