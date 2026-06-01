@@ -383,27 +383,40 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * Al confirmar una orden, descuenta los insumos según las recetas.
+     * Descuenta receta base + adiciones de la variante seleccionada (modelo aditivo).
      * Si el stock cae bajo el mínimo se loguea una alerta pero no se bloquea.
      */
     private void deductInventory(Order order) {
         for (OrderItem item : order.getItems()) {
-            recipeRepo.findByMenuItemIdAndIsActiveTrue(item.getMenuItem().getId())
-                    .ifPresent(recipe -> {
-                        for (RecipeIngredient ingredient : recipe.getIngredients()) {
-                            BigDecimal totalQty = ingredient.getQuantity()
-                                    .multiply(BigDecimal.valueOf(item.getQuantity()));
-                            InventoryMovementRequest movReq = new InventoryMovementRequest();
-                            movReq.setMovementType("salida");
-                            movReq.setQuantity(totalQty);
-                            movReq.setEmployeeId(order.getEmployee().getId());
-                            try {
-                                inventoryService.register(ingredient.getSupply().getId(), movReq);
-                            } catch (Exception e) {
-                                log.warn("No se pudo descontar insumo {} para orden {}: {}",
-                                        ingredient.getSupply().getId(), order.getFolio(), e.getMessage());
-                            }
-                        }
-                    });
+            Long menuItemId = item.getMenuItem().getId();
+            Long employeeId = order.getEmployee().getId();
+
+            // Receta base (variant_id IS NULL)
+            recipeRepo.findByMenuItemIdAndVariantIdIsNullAndIsActiveTrue(menuItemId)
+                    .ifPresent(r -> deductRecipeIngredients(r, item.getQuantity(), employeeId, order.getFolio()));
+
+            // Adiciones específicas de la variante pedida
+            if (item.getVariant() != null) {
+                recipeRepo.findByMenuItemIdAndVariantIdAndIsActiveTrue(menuItemId, item.getVariant().getId())
+                        .ifPresent(r -> deductRecipeIngredients(r, item.getQuantity(), employeeId, order.getFolio()));
+            }
+        }
+    }
+
+    private void deductRecipeIngredients(Recipe recipe, int quantity, Long employeeId, String folio) {
+        for (RecipeIngredient ingredient : recipe.getIngredients()) {
+            BigDecimal totalQty = ingredient.getQuantity()
+                    .multiply(BigDecimal.valueOf(quantity));
+            InventoryMovementRequest movReq = new InventoryMovementRequest();
+            movReq.setMovementType("salida");
+            movReq.setQuantity(totalQty);
+            movReq.setEmployeeId(employeeId);
+            try {
+                inventoryService.register(ingredient.getSupply().getId(), movReq);
+            } catch (Exception e) {
+                log.warn("No se pudo descontar insumo {} para orden {}: {}",
+                        ingredient.getSupply().getId(), folio, e.getMessage());
+            }
         }
     }
 

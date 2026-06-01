@@ -274,6 +274,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - **`sales`**: columnas `subtotal`, `payment_method`, `notes`, `customer_id`, `cash_session_id`, `order_id` — todas mapeadas en la entidad `Sale`. `folio` usa el mismo valor que la orden de origen (auto-creación) o `VTA-{id}-{yyyyMMdd}-{seq4}` (creación manual). `order_id` es nullable y tiene índice UNIQUE — `null` en ventas manuales; apunta a la orden que la generó en ventas auto-creadas. FK con `ON DELETE SET NULL` (la lógica de borrado en cascada la maneja la capa de servicio).
 - **`sale_items.unit_price`**: `DECIMAL NOT NULL` — mapeado en `SaleItem`. En auto-creación se copia de `orderItem.unitPrice`; en creación manual se deriva de `subtotal / quantity`.
 - **`order_items.group_label` / `sale_items.group_label`**: `VARCHAR(100) NULL` — `null` para ítems individuales; contiene el nombre del combo (ej. `"Combo Familiar"`) cuando el ítem proviene de un combo. El frontend lo envía en `OrderItemRequest.groupLabel`; `SaleServiceImpl.createFromOrder` lo propaga automáticamente al crear la venta. No hay FK al catálogo de combos — es un snapshot de texto.
+- **`OrderResponse.customerPhone`**: el record incluye el teléfono del cliente (`customer.phone`) mapeado directamente desde la entidad `Customer`. Presente desde la versión actual — útil para mostrar datos de contacto en la vista de detalle de orden.
 - **`order_item_extras` — código muerto:** La tabla existe en DB (creada en V2) y los archivos `OrderItemExtra.java`, `OrderItemExtraRequest.java`, `OrderItemExtraResponse.java` aún están en el repo, pero ningún servicio ni controller los referencia. Fueron reemplazados por el sistema de modificadores (`order_item_modifiers`). No extender ni usar estos archivos.
 
 ### Vistas SQL (usar con `nativeQuery = true`)
@@ -302,7 +303,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 1. **Multi-restaurante:** Siempre filtrar por `restaurant_id` — nunca devolver datos de todos los restaurantes sin filtro explícito
 2. **Soft-delete:** Tablas con `is_active` nunca se borran físicamente — `entity.setActive(false); repo.save(entity)`
-3. **Stock:** Las órdenes nacen en `CONFIRMED` y los insumos se descuentan al crearse (`deductInventory` en `OrderServiceImpl.create()`). Si `currentStock < minimumStock`, `log.warn(...)` (no bloquear)
+3. **Stock:** Las órdenes nacen en `CONFIRMED` y los insumos se descuentan al crearse (`deductInventory` en `OrderServiceImpl.create()`). Si `currentStock < minimumStock`, `log.warn(...)` (no bloquear). El descuento usa un **modelo aditivo**: primero descuenta la receta base del ítem (`variant_id IS NULL`), y si el ítem tiene variante, descuenta también la receta específica de esa variante — ambas se acumulan. Si no existe receta base pero sí de variante, solo se descuenta la de variante (y viceversa).
 4. **Folio de orden:** `FolioGenerator.generateOrderFolio(restaurantId, date, sequence)` → `ORD-{id}-{yyyyMMdd}-{seq4}`. La secuencia se calcula con `countByFolioPrefix` (LIKE en el folio) — NO con COUNT por fecha para evitar problemas de zona horaria con MVCC. `OrderServiceImpl.create()` usa `Isolation.READ_COMMITTED` para evitar snapshots obsoletos en creaciones concurrentes.
 5. **Historial de estado:** Cada cambio de `orders.status` inserta en `order_status_history`. El primer registro va con `fromStatus = null`
 6. **Transiciones de estado:** Solo se permiten las definidas en `OrderServiceImpl.ALLOWED_TRANSITIONS`. El mapa incluye `PENDING → CONFIRMED/CANCELLED` por retrocompatibilidad, pero `PENDING` nunca es el estado inicial de una orden nueva — `create()` siempre asigna `CONFIRMED`.
@@ -347,7 +348,8 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/menu/categories`
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/menu/items`
 - `GET/POST/PUT/DELETE /api/v1/menu-items/{itemId}/variants`
-- `GET/POST            /api/v1/menu-items/{itemId}/recipe`
+- `GET/POST            /api/v1/menu-items/{itemId}/recipe` — receta base del ítem (sin variante)
+- `GET                 /api/v1/menu-items/{itemId}/recipes` — todas las recetas activas del ítem (base + por variante)
 
 ### Unidades de medida
 - `GET/POST/PUT        /api/v1/units`

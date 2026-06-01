@@ -52,6 +52,15 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<RecipeResponse> getAllByMenuItem(Long menuItemId) {
+        return recipeRepo.findAllByMenuItemIdAndIsActiveTrue(menuItemId)
+                .stream()
+                .map(mapper::toResponse)
+                .toList();
+    }
+
+    @Override
     public RecipeResponse createOrUpdate(Long menuItemId, RecipeRequest request) {
         var menuItem = menuItemRepo.findById(menuItemId)
                 .orElseThrow(() -> new ResourceNotFoundException("MenuItem", menuItemId));

@@ -15,6 +15,7 @@ public record OrderResponse(
         String paymentMethod,
         Long customerId,
         String customerFirstName,
+        String customerPhone,
         Long employeeId,
         String employeeUsername,
         Long driverId,

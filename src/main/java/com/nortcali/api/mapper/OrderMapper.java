@@ -15,6 +15,7 @@ public interface OrderMapper {
     @Mapping(expression = "java(entity.getPaymentMethod() != null ? entity.getPaymentMethod().name().toLowerCase() : null)", target = "paymentMethod")
     @Mapping(source = "customer.id", target = "customerId")
     @Mapping(source = "customer.firstName", target = "customerFirstName")
+    @Mapping(source = "customer.phone", target = "customerPhone")
     @Mapping(source = "employee.id", target = "employeeId")
     @Mapping(source = "employee.username", target = "employeeUsername")
     @Mapping(source = "driver.id", target = "driverId")
@@ -25,7 +26,7 @@ public interface OrderMapper {
     default OrderResponse toResponse(Order entity, Long saleId) {
         OrderResponse r = toResponse(entity);
         return new OrderResponse(r.id(), r.restaurantId(), r.folio(), r.orderType(), r.source(),
-                r.status(), r.total(), r.paymentMethod(), r.customerId(), r.customerFirstName(),
+                r.status(), r.total(), r.paymentMethod(), r.customerId(), r.customerFirstName(), r.customerPhone(),
                 r.employeeId(), r.employeeUsername(), r.driverId(), r.driverFirstName(),
                 r.createdAt(), r.preparingAt(), r.readyAt(), r.preparationTimeSeconds(), r.items(), saleId, r.notes());
     }

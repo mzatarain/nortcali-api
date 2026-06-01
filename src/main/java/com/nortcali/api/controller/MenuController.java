@@ -157,6 +157,11 @@ public class MenuController {
         return ResponseEntity.ok(recipeService.getByMenuItem(itemId));
     }
 
+    @GetMapping("/menu-items/{itemId}/recipes")
+    public ResponseEntity<List<RecipeResponse>> getAllRecipes(@PathVariable Long itemId) {
+        return ResponseEntity.ok(recipeService.getAllByMenuItem(itemId));
+    }
+
     @PostMapping("/menu-items/{itemId}/recipe")
     public ResponseEntity<RecipeResponse> createOrUpdateRecipe(@PathVariable Long itemId,
                                                                @Valid @RequestBody RecipeRequest request) {
