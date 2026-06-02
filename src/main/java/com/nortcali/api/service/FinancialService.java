@@ -14,5 +14,5 @@ public interface FinancialService {
 
     FinancialPeriodResponse createPeriod(Long restaurantId, FinancialPeriodRequest request);
 
-    FinancialPeriodResponse closePeriod(Long periodId);
+    FinancialPeriodResponse closePeriod(Long restaurantId, Long periodId);
 }

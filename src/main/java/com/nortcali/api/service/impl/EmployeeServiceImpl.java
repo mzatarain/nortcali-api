@@ -4,6 +4,7 @@ import com.nortcali.api.dto.request.EmployeeRequest;
 import com.nortcali.api.dto.request.EmployeeStatusRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.entity.Employee;
+import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.DuplicateResourceException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.EmployeeMapper;
@@ -11,6 +12,7 @@ import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.RestaurantRepository;
 import com.nortcali.api.service.EmployeeService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,8 +50,12 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     @Transactional(readOnly = true)
-    public EmployeeResponse getById(Long id) {
-        return mapper.toResponse(findOrThrow(id));
+    public EmployeeResponse getById(Long restaurantId, Long id) {
+        Employee employee = findOrThrow(id);
+        if (!employee.getRestaurantId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Employee", id);
+        }
+        return mapper.toResponse(employee);
     }
 
     @Override
@@ -69,6 +75,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setPassword(passwordEncoder.encode(request.getPassword()));
         employee.setPhone(request.getPhone());
         employee.setEmail(request.getEmail());
+        enforceRoleCeiling(request.getRole());
         employee.setRole(request.getRole());
         employee.setStatus(request.getStatus() != null ? request.getStatus() : "ACTIVE");
         employee.setHireDate(request.getHireDate());
@@ -92,6 +99,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setLastName(request.getLastName());
         employee.setPhone(request.getPhone());
         employee.setEmail(request.getEmail());
+        enforceRoleCeiling(request.getRole());
         employee.setRole(request.getRole());
         employee.setStatus(request.getStatus());
         employee.setHireDate(request.getHireDate());
@@ -108,6 +116,15 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setStatus(request.getStatus());
         log.info("Empleado {} cambió status a {}", id, request.getStatus());
         return mapper.toResponse(employeeRepo.save(employee));
+    }
+
+    private void enforceRoleCeiling(String requestedRole) {
+        boolean callerIsAdmin = SecurityContextHolder.getContext().getAuthentication()
+                .getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if ("ADMIN".equals(requestedRole) && !callerIsAdmin) {
+            throw new BusinessRuleException("Solo un ADMIN puede asignar el rol ADMIN");
+        }
     }
 
     private Employee findOrThrow(Long id) {

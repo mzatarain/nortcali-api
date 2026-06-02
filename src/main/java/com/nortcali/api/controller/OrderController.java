@@ -46,7 +46,7 @@ public class OrderController {
     @GetMapping("/restaurants/{restaurantId}/orders/{id}")
     public ResponseEntity<OrderResponse> getById(@PathVariable Long restaurantId,
                                                  @PathVariable Long id) {
-        return ResponseEntity.ok(orderService.getById(id));
+        return ResponseEntity.ok(orderService.getById(restaurantId, id));
     }
 
     @PostMapping("/restaurants/{restaurantId}/orders")
@@ -56,16 +56,18 @@ public class OrderController {
                 .body(orderService.create(restaurantId, request));
     }
 
-    @PutMapping("/orders/{id}/status")
-    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long id,
+    @PutMapping("/restaurants/{restaurantId}/orders/{id}/status")
+    public ResponseEntity<OrderResponse> updateStatus(@PathVariable Long restaurantId,
+                                                      @PathVariable Long id,
                                                       @Valid @RequestBody OrderStatusUpdateRequest request) {
         log.info(">>> updateOrderStatus llamado. orderId={}, toStatus={}", id, request.getToStatus());
-        return ResponseEntity.ok(orderService.updateStatus(id, request));
+        return ResponseEntity.ok(orderService.updateStatus(restaurantId, id, request));
     }
 
-    @GetMapping("/orders/{id}/history")
-    public ResponseEntity<List<OrderStatusHistoryResponse>> getHistory(@PathVariable Long id) {
-        return ResponseEntity.ok(orderService.getHistory(id));
+    @GetMapping("/restaurants/{restaurantId}/orders/{id}/history")
+    public ResponseEntity<List<OrderStatusHistoryResponse>> getHistory(@PathVariable Long restaurantId,
+                                                                       @PathVariable Long id) {
+        return ResponseEntity.ok(orderService.getHistory(restaurantId, id));
     }
 
     @PostMapping("/restaurants/{restaurantId}/orders/close-day")
@@ -82,10 +84,11 @@ public class OrderController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/orders/{id}/payments")
-    public ResponseEntity<PaymentResponse> addPayment(@PathVariable Long id,
+    @PostMapping("/restaurants/{restaurantId}/orders/{id}/payments")
+    public ResponseEntity<PaymentResponse> addPayment(@PathVariable Long restaurantId,
+                                                      @PathVariable Long id,
                                                       @Valid @RequestBody PaymentRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(orderService.addPayment(id, request));
+                .body(orderService.addPayment(restaurantId, id, request));
     }
 }

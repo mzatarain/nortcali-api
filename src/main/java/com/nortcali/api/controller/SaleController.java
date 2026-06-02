@@ -13,6 +13,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -48,18 +49,20 @@ public class SaleController {
 
     @GetMapping("/{id}")
     public ResponseEntity<SaleResponse> getById(@PathVariable Long restaurantId, @PathVariable Long id) {
-        return ResponseEntity.ok(saleService.getById(id));
+        return ResponseEntity.ok(saleService.getById(restaurantId, id));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @PostMapping
     public ResponseEntity<SaleResponse> create(@PathVariable Long restaurantId,
                                                @Valid @RequestBody SaleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(saleService.create(restaurantId, request));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deactivate(@PathVariable Long restaurantId, @PathVariable Long id) {
-        saleService.deactivate(id);
+        saleService.deactivate(restaurantId, id);
         return ResponseEntity.noContent().build();
     }
 }

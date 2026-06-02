@@ -17,9 +17,6 @@ public class PaymentRequest {
 
     private String reference;
 
-    @NotNull(message = "El empleado que registra el pago es obligatorio")
-    private Long registeredBy;
-
     public String getMethod() { return method; }
     public void setMethod(String method) { this.method = method; }
 
@@ -28,7 +25,4 @@ public class PaymentRequest {
 
     public String getReference() { return reference; }
     public void setReference(String reference) { this.reference = reference; }
-
-    public Long getRegisteredBy() { return registeredBy; }
-    public void setRegisteredBy(Long registeredBy) { this.registeredBy = registeredBy; }
 }

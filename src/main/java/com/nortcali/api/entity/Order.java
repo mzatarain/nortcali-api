@@ -80,7 +80,7 @@ public class Order {
 
     @PrePersist
     void onCreate() {
-        if (this.createdAt == null) this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
     }
 
     public Order() {}

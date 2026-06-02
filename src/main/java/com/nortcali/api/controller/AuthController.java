@@ -1,9 +1,11 @@
 package com.nortcali.api.controller;
 
+import com.nortcali.api.config.LoginRateLimiter;
 import com.nortcali.api.dto.request.LoginRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.dto.response.LoginResponse;
 import com.nortcali.api.entity.Session;
+import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.EmployeeMapper;
 import com.nortcali.api.repository.EmployeeRepository;
@@ -14,7 +16,11 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,22 +36,29 @@ public class AuthController {
     private final SessionRepository sessionRepo;
     private final EmployeeRepository employeeRepo;
     private final EmployeeMapper employeeMapper;
+    private final LoginRateLimiter loginRateLimiter;
 
     public AuthController(AuthenticationManager authManager,
                           JwtUtil jwtUtil,
                           SessionRepository sessionRepo,
                           EmployeeRepository employeeRepo,
-                          EmployeeMapper employeeMapper) {
+                          EmployeeMapper employeeMapper,
+                          LoginRateLimiter loginRateLimiter) {
         this.authManager = authManager;
         this.jwtUtil = jwtUtil;
         this.sessionRepo = sessionRepo;
         this.employeeRepo = employeeRepo;
         this.employeeMapper = employeeMapper;
+        this.loginRateLimiter = loginRateLimiter;
     }
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
                                                HttpServletRequest httpRequest) {
+        if (!loginRateLimiter.tryConsume(httpRequest.getRemoteAddr())) {
+            throw new BusinessRuleException("Demasiados intentos de inicio de sesión. Intenta de nuevo en un minuto.");
+        }
+
         authManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
         );
@@ -57,7 +70,7 @@ public class AuthController {
 
         // Registrar sesión activa en tabla sessions, con fecha de expiración alineada al JWT
         Session session = new Session();
-        session.setToken(token);
+        session.setToken(sha256Hex(token));
         session.setEmployee(employee);
         session.setIpAddress(httpRequest.getRemoteAddr());
         session.setActive(true);
@@ -75,7 +88,7 @@ public class AuthController {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             // Soft-delete: marcar sesión como inactiva
-            sessionRepo.findByTokenAndIsActiveTrue(token).ifPresent(s -> {
+            sessionRepo.findByTokenAndIsActiveTrue(sha256Hex(token)).ifPresent(s -> {
                 s.setActive(false);
                 sessionRepo.save(s);
                 log.info("Sesión invalidada para '{}'", s.getEmployee().getUsername());
@@ -94,7 +107,7 @@ public class AuthController {
         String oldToken = authHeader.substring(7); // "Bearer " ya validado por el filtro
 
         // Localizar sesión activa actual (garantizado por el filtro, pero verificamos por coherencia)
-        Session oldSession = sessionRepo.findByTokenAndIsActiveTrue(oldToken)
+        Session oldSession = sessionRepo.findByTokenAndIsActiveTrue(sha256Hex(oldToken))
                 .orElseThrow(() -> new ResourceNotFoundException("Sesión activa no encontrada para el token"));
 
         var employee = employeeRepo.findByUsername(username)
@@ -109,7 +122,7 @@ public class AuthController {
 
         // Crear nueva sesión con el token renovado
         Session newSession = new Session();
-        newSession.setToken(newToken);
+        newSession.setToken(sha256Hex(newToken));
         newSession.setEmployee(employee);
         newSession.setIpAddress(httpRequest.getRemoteAddr());
         newSession.setActive(true);
@@ -128,6 +141,13 @@ public class AuthController {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
         return ResponseEntity.ok(employeeMapper.toResponse(employee));
     }
+    private static String sha256Hex(String input) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
 }
-
-

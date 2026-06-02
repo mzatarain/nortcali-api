@@ -10,7 +10,7 @@ public interface EmployeeService {
 
     List<EmployeeResponse> getByRestaurant(Long restaurantId);
 
-    EmployeeResponse getById(Long id);
+    EmployeeResponse getById(Long restaurantId, Long id);
 
     EmployeeResponse create(Long restaurantId, EmployeeRequest request);
 

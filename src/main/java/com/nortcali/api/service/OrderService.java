@@ -17,15 +17,15 @@ public interface OrderService {
 
     Page<OrderResponse> getByRestaurant(Long restaurantId, List<String> statuses, LocalDate date, Pageable pageable);
 
-    OrderResponse getById(Long id);
+    OrderResponse getById(Long restaurantId, Long id);
 
     OrderResponse create(Long restaurantId, OrderRequest request);
 
-    OrderResponse updateStatus(Long id, OrderStatusUpdateRequest request);
+    OrderResponse updateStatus(Long restaurantId, Long id, OrderStatusUpdateRequest request);
 
-    List<OrderStatusHistoryResponse> getHistory(Long orderId);
+    List<OrderStatusHistoryResponse> getHistory(Long restaurantId, Long orderId);
 
-    PaymentResponse addPayment(Long orderId, PaymentRequest request);
+    PaymentResponse addPayment(Long restaurantId, Long orderId, PaymentRequest request);
 
     void delete(Long restaurantId, Long orderId);
 

@@ -3,6 +3,7 @@ package com.nortcali.api.dto.request;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
@@ -22,7 +23,8 @@ public class EmployeeRequest {
     private String username;
 
     @NotBlank(message = "La contraseña es obligatoria")
-    @Size(min = 6, message = "La contraseña debe tener al menos 6 caracteres")
+    @Pattern(regexp = "^(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{10,}$",
+             message = "La contraseña debe tener mínimo 10 caracteres, una mayúscula, un número y un carácter especial")
     private String password;
 
     @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
@@ -33,6 +35,8 @@ public class EmployeeRequest {
     private String email;
 
     @NotBlank(message = "El rol es obligatorio")
+    @Pattern(regexp = "ADMIN|MANAGER|CASHIER|WAITER|KITCHEN|DELIVERY",
+             message = "El rol debe ser uno de: ADMIN, MANAGER, CASHIER, WAITER, KITCHEN, DELIVERY")
     private String role;
 
     private String status = "ACTIVE";

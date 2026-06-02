@@ -13,21 +13,25 @@ import com.nortcali.api.mapper.OrderMapper;
 import com.nortcali.api.repository.*;
 import com.nortcali.api.service.InventoryMovementService;
 import com.nortcali.api.service.SaleService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +63,19 @@ class OrderServiceImplTest {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void mockSecurityContext(String username) {
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                username, null, Collections.emptyList());
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(auth);
+        SecurityContextHolder.setContext(ctx);
+    }
+
     private Restaurant restaurant(Long id) {
         Restaurant r = new Restaurant();
         r.setId(id);
@@ -86,10 +103,9 @@ class OrderServiceImplTest {
         return r;
     }
 
-    private OrderStatusUpdateRequest statusRequest(String toStatus, Long employeeId) {
+    private OrderStatusUpdateRequest statusRequest(String toStatus) {
         OrderStatusUpdateRequest r = new OrderStatusUpdateRequest();
         r.setToStatus(toStatus);
-        r.setEmployeeId(employeeId);
         return r;
     }
 
@@ -111,6 +127,7 @@ class OrderServiceImplTest {
         order.setFolio("ORD-1-20260415-0001");
         order.setStatus(status);
         order.setEmployee(employee(5L));
+        order.setRestaurant(restaurant(1L));
         order.getItems().add(orderItem);
         return order;
     }
@@ -120,12 +137,12 @@ class OrderServiceImplTest {
     @Test
     void create_generaFolio_calculaTotal_yRegistraPrimerHistorial() {
         Long restaurantId = 1L;
-        Long employeeId = 5L;
         Long menuItemId = 10L;
         BigDecimal price = new BigDecimal("80.00");
 
+        mockSecurityContext("mesero01");
         when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
-        when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(menuItemRepo.findById(menuItemId)).thenReturn(Optional.of(menuItem(menuItemId, "Burrito")));
         when(orderRepo.countByFolioPrefix(eq(restaurantId), anyString())).thenReturn(0L);
 
@@ -136,12 +153,11 @@ class OrderServiceImplTest {
             return o;
         });
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
-        when(mapper.toResponse(any(Order.class))).thenReturn(mock(OrderResponse.class));
+        when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
 
         OrderRequest request = new OrderRequest();
         request.setOrderType("dine_in");
         request.setSource("pos");
-        request.setEmployeeId(employeeId);
         request.setItems(List.of(itemRequest(menuItemId, 2, price)));
 
         service.create(restaurantId, request);
@@ -167,21 +183,20 @@ class OrderServiceImplTest {
     @Test
     void create_variosItems_sumaTotalCorrectamente() {
         Long restaurantId = 1L;
-        Long employeeId = 5L;
 
+        mockSecurityContext("mesero01");
         when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
-        when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L, "Tacos")));
         when(menuItemRepo.findById(11L)).thenReturn(Optional.of(menuItem(11L, "Refresco")));
         when(orderRepo.countByFolioPrefix(eq(restaurantId), anyString())).thenReturn(3L);
         when(orderRepo.save(any(Order.class))).thenAnswer(inv -> { Order o = inv.getArgument(0); o.setId(1L); return o; });
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
-        when(mapper.toResponse(any(Order.class))).thenReturn(mock(OrderResponse.class));
+        when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
 
         OrderRequest request = new OrderRequest();
         request.setOrderType("takeout");
         request.setSource("whatsapp");
-        request.setEmployeeId(employeeId);
         request.setItems(List.of(
                 itemRequest(10L, 3, new BigDecimal("30.00")),  // 90
                 itemRequest(11L, 2, new BigDecimal("20.00"))   // 40
@@ -204,7 +219,6 @@ class OrderServiceImplTest {
         OrderRequest req = new OrderRequest();
         req.setOrderType("dine_in");
         req.setSource("pos");
-        req.setEmployeeId(1L);
         req.setItems(List.of());
 
         assertThatThrownBy(() -> service.create(99L, req))
@@ -217,19 +231,18 @@ class OrderServiceImplTest {
 
     @Test
     void updateStatus_transiciónVálida_actualizaEstadoYGuardaHistorial() {
+        Long restaurantId = 1L;
         Long orderId = 1L;
         Order order = orderWithStatus(orderId, OrderStatus.PENDING);
 
+        mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findById(5L)).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(orderRepo.save(any())).thenReturn(order);
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
-        when(mapper.toResponse(any())).thenReturn(mock(OrderResponse.class));
-        // Sin recetas: el descuento de inventario no ocurre para CONFIRMED en este test
-        // pero aquí transitamos a CONFIRMED
-        when(recipeRepo.findByMenuItemIdAndIsActiveTrue(10L)).thenReturn(Optional.empty());
+        when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
 
-        service.updateStatus(orderId, statusRequest("confirmed", 5L));
+        service.updateStatus(restaurantId, orderId, statusRequest("confirmed"));
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
 
@@ -243,14 +256,16 @@ class OrderServiceImplTest {
 
     @Test
     void updateStatus_transiciónInválida_lanzaBusinessRuleException() {
+        Long restaurantId = 1L;
         Long orderId = 1L;
         Order order = orderWithStatus(orderId, OrderStatus.DELIVERED);
 
+        mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findById(5L)).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
 
         // DELIVERED → CONFIRMED no está permitido
-        assertThatThrownBy(() -> service.updateStatus(orderId, statusRequest("confirmed", 5L)))
+        assertThatThrownBy(() -> service.updateStatus(restaurantId, orderId, statusRequest("confirmed")))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Transición de estado no permitida");
 
@@ -259,13 +274,15 @@ class OrderServiceImplTest {
 
     @Test
     void updateStatus_estadoFinalCancelled_noPermiteOtraTransición() {
+        Long restaurantId = 1L;
         Long orderId = 1L;
         Order order = orderWithStatus(orderId, OrderStatus.CANCELLED);
 
+        mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findById(5L)).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
 
-        assertThatThrownBy(() -> service.updateStatus(orderId, statusRequest("pending", 5L)))
+        assertThatThrownBy(() -> service.updateStatus(restaurantId, orderId, statusRequest("pending")))
                 .isInstanceOf(BusinessRuleException.class);
     }
 
@@ -273,6 +290,7 @@ class OrderServiceImplTest {
 
     @Test
     void updateStatus_aConfirmed_descuentaInventarioPorReceta() {
+        Long restaurantId = 1L;
         Long orderId = 1L;
         Order order = orderWithStatus(orderId, OrderStatus.PENDING);
         // item: menuItem id=10, qty=2
@@ -287,14 +305,15 @@ class OrderServiceImplTest {
         Recipe recipe = new Recipe();
         recipe.getIngredients().add(ingredient);
 
+        mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findById(5L)).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(orderRepo.save(any())).thenReturn(order);
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
-        when(mapper.toResponse(any())).thenReturn(mock(OrderResponse.class));
-        when(recipeRepo.findByMenuItemIdAndIsActiveTrue(10L)).thenReturn(Optional.of(recipe));
+        when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
+        when(recipeRepo.findByMenuItemIdAndVariantIdIsNullAndIsActiveTrue(10L)).thenReturn(Optional.of(recipe));
 
-        service.updateStatus(orderId, statusRequest("confirmed", 5L));
+        service.updateStatus(restaurantId, orderId, statusRequest("confirmed"));
 
         // Debe llamarse register para el suministro con qty = 0.5 * 2 = 1.0
         ArgumentCaptor<InventoryMovementRequest> movCaptor =
@@ -308,6 +327,7 @@ class OrderServiceImplTest {
 
     @Test
     void updateStatus_aConfirmed_siInventarioFalla_continúaSinExcepción() {
+        Long restaurantId = 1L;
         Long orderId = 1L;
         Order order = orderWithStatus(orderId, OrderStatus.PENDING);
 
@@ -319,18 +339,19 @@ class OrderServiceImplTest {
         Recipe recipe = new Recipe();
         recipe.getIngredients().add(ingredient);
 
+        mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findById(5L)).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(orderRepo.save(any())).thenReturn(order);
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
-        when(mapper.toResponse(any())).thenReturn(mock(OrderResponse.class));
-        when(recipeRepo.findByMenuItemIdAndIsActiveTrue(10L)).thenReturn(Optional.of(recipe));
+        when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
+        when(recipeRepo.findByMenuItemIdAndVariantIdIsNullAndIsActiveTrue(10L)).thenReturn(Optional.of(recipe));
         // Simula que el descuento falla (ej. stock insuficiente)
         doThrow(new BusinessRuleException("Stock insuficiente"))
                 .when(inventoryService).register(anyLong(), any());
 
         // La orden igual cambia de estado; el error de inventario solo se loguea
-        service.updateStatus(orderId, statusRequest("confirmed", 5L));
+        service.updateStatus(restaurantId, orderId, statusRequest("confirmed"));
 
         assertThat(order.getStatus()).isEqualTo(OrderStatus.CONFIRMED);
     }
@@ -341,7 +362,7 @@ class OrderServiceImplTest {
     void updateStatus_ordenNoEncontrada_lanzaResourceNotFoundException() {
         when(orderRepo.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.updateStatus(99L, statusRequest("confirmed", 1L)))
+        assertThatThrownBy(() -> service.updateStatus(1L, 99L, statusRequest("confirmed")))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 

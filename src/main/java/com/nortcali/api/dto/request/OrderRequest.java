@@ -3,33 +3,31 @@ package com.nortcali.api.dto.request;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public class OrderRequest {
 
     @NotBlank(message = "El tipo de orden es obligatorio (dine_in, takeout, delivery)")
+    @Pattern(regexp = "dine_in|takeout|delivery",
+             message = "El tipo de orden debe ser uno de: dine_in, takeout, delivery")
     private String orderType;
 
     @NotBlank(message = "La fuente es obligatoria (pos, whatsapp, phone, rappi, uber_eats, web)")
+    @Pattern(regexp = "pos|whatsapp|phone|rappi|uber_eats|web",
+             message = "La fuente debe ser una de: pos, whatsapp, phone, rappi, uber_eats, web")
     private String source;
 
     private Long customerId;
 
     private Long driverId;
 
-    @NotNull(message = "El empleado es obligatorio")
-    private Long employeeId;
-
     private String paymentMethod;
 
     @Size(max = 1000, message = "Las notas no pueden superar los 1000 caracteres")
     private String notes;
-
-    private LocalDateTime createdAt;
 
     @NotEmpty(message = "La orden debe tener al menos un ítem")
     @Valid
@@ -47,9 +45,6 @@ public class OrderRequest {
     public Long getDriverId() { return driverId; }
     public void setDriverId(Long driverId) { this.driverId = driverId; }
 
-    public Long getEmployeeId() { return employeeId; }
-    public void setEmployeeId(Long employeeId) { this.employeeId = employeeId; }
-
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
 
@@ -58,7 +53,4 @@ public class OrderRequest {
 
     public List<OrderItemRequest> getItems() { return items; }
     public void setItems(List<OrderItemRequest> items) { this.items = items; }
-
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

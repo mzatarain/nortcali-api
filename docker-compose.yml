@@ -16,8 +16,8 @@ services:
       # Scripts de inicialización — se ejecutan solo en la primera vez (DB vacía)
       - ./src/main/resources/db:/docker-entrypoint-initdb.d:ro
     ports:
-      # Exponer solo en desarrollo; en producción eliminar o restringir a 127.0.0.1
-      - "3306:3306"
+      # Solo acceso local (TablePlus/DBeaver). En producción eliminar este bloque por completo.
+      - "127.0.0.1:3306:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
       interval: 10s

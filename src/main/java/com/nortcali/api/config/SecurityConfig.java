@@ -15,6 +15,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Instant;
 
 @Configuration
 @EnableWebSecurity
@@ -48,8 +49,7 @@ public class SecurityConfig {
 
                 // ── Endpoints públicos ────────────────────────────────────────
                 .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
-                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
 
                 // ── Solo ADMIN ────────────────────────────────────────────────
                 // Catálogos de configuración del sistema — rara vez modificados
@@ -71,13 +71,27 @@ public class SecurityConfig {
             .sessionManagement(sess ->
                 sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-            // Devolver 401 para acceso sin autenticar (por defecto Spring Security devuelve 403)
             .exceptionHandling(ex -> ex
-                .authenticationEntryPoint((request, response, authException) ->
-                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized"))
+                .authenticationEntryPoint((request, response, authException) -> {
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write(jsonError(401, "Unauthorized", "Autenticación requerida"));
+                })
+                .accessDeniedHandler((request, response, denied) -> {
+                    response.setContentType("application/json;charset=UTF-8");
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter().write(jsonError(403, "Forbidden", "No tienes permiso para realizar esta acción"));
+                })
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private static String jsonError(int status, String error, String message) {
+        return "{\"status\":" + status
+                + ",\"error\":\"" + error + "\""
+                + ",\"message\":\"" + message + "\""
+                + ",\"timestamp\":\"" + Instant.now() + "\"}";
     }
 }

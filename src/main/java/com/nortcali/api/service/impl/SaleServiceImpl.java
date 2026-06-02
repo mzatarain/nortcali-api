@@ -86,13 +86,17 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     @Transactional(readOnly = true)
-    public SaleResponse getById(Long id) {
-        return mapper.toResponse(findOrThrow(id));
+    public SaleResponse getById(Long restaurantId, Long id) {
+        Sale sale = findOrThrow(id);
+        if (!sale.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Sale", id);
+        }
+        return mapper.toResponse(sale);
     }
 
     @Override
     public SaleResponse create(Long restaurantId, SaleRequest request) {
-        restaurantRepo.findById(restaurantId)
+        var restaurant = restaurantRepo.findById(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
         var source = sourceRepo.findById(request.getSourceId())
                 .orElseThrow(() -> new ResourceNotFoundException("SalesSource", request.getSourceId()));
@@ -100,11 +104,15 @@ public class SaleServiceImpl implements SaleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
 
         LocalDate saleDate = request.getSaleDate();
+        LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
+        if (saleDate.isAfter(today)) {
+            throw new BusinessRuleException("La fecha de venta no puede ser futura");
+        }
         String folioPrefix = FolioGenerator.saleFolioPrefix(restaurantId, saleDate) + "%";
         long sequence = saleRepo.countByFolioPrefix(restaurantId, folioPrefix) + 1;
 
         Sale sale = new Sale();
-        sale.setRestaurant(restaurantRepo.getReferenceById(restaurantId));
+        sale.setRestaurant(restaurant);
         sale.setSource(source);
         sale.setEmployee(employee);
         sale.setSaleDate(saleDate);
@@ -149,8 +157,11 @@ public class SaleServiceImpl implements SaleService {
     }
 
     @Override
-    public void deactivate(Long id) {
+    public void deactivate(Long restaurantId, Long id) {
         Sale entity = findOrThrow(id);
+        if (!entity.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Sale", id);
+        }
         entity.setActive(false);
         saleRepo.save(entity);
     }

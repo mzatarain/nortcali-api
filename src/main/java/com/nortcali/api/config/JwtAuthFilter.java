@@ -5,6 +5,10 @@ import com.nortcali.api.security.JwtUtil;
 import com.nortcali.api.service.EmployeeDetailsService;
 import io.jsonwebtoken.io.IOException;
 import jakarta.servlet.FilterChain;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -58,7 +62,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().getAuthentication() == null) {
 
             // Verificar que la sesión existe en DB, está activa y no ha expirado
-            var session = sessionRepo.findByTokenAndIsActiveTrue(token);
+            var session = sessionRepo.findByTokenAndIsActiveTrue(sha256Hex(token));
 
             boolean sessionValid = session.isPresent();
 
@@ -96,5 +100,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 }

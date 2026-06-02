@@ -125,9 +125,12 @@ public class FinancialServiceImpl implements FinancialService {
     }
 
     @Override
-    public FinancialPeriodResponse closePeriod(Long periodId) {
+    public FinancialPeriodResponse closePeriod(Long restaurantId, Long periodId) {
         FinancialPeriod entity = periodRepo.findById(periodId)
                 .orElseThrow(() -> new ResourceNotFoundException("FinancialPeriod", periodId));
+        if (!entity.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("FinancialPeriod", periodId);
+        }
         if ("closed".equals(entity.getStatus())) {
             throw new BusinessRuleException("El período ya está cerrado");
         }

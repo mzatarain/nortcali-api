@@ -14,11 +14,11 @@ public interface SaleService {
 
     Page<SaleResponse> getByRestaurant(Long restaurantId, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
-    SaleResponse getById(Long id);
+    SaleResponse getById(Long restaurantId, Long id);
 
     SaleResponse create(Long restaurantId, SaleRequest request);
 
-    void deactivate(Long id);
+    void deactivate(Long restaurantId, Long id);
 
     List<SalesBySourceResponse> getSalesBySource(Long restaurantId, LocalDate startDate, LocalDate endDate);
 

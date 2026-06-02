@@ -70,12 +70,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-			<scope>runtime</scope>
-			<optional>true</optional>
-		</dependency>
-		<dependency>
 			<groupId>com.mysql</groupId>
 			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
@@ -112,6 +106,19 @@
 			<version>8.0</version>
 		</dependency>
 
+		<!-- Rate limiting -->
+		<dependency>
+			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-core</artifactId>
+			<version>8.10.1</version>
+		</dependency>
+
+		<!-- Caffeine cache — TTL-bounded bucket map for rate limiter -->
+		<dependency>
+			<groupId>com.github.ben-manes.caffeine</groupId>
+			<artifactId>caffeine</artifactId>
+		</dependency>
+
     	 <!-- Security -->
     	<dependency>
        		<groupId>org.springframework.boot</groupId>
@@ -121,19 +128,19 @@
     	<dependency>
        	  <groupId>io.jsonwebtoken</groupId>
       	  <artifactId>jjwt-api</artifactId>
-      	  <version>0.11.5</version>
+      	  <version>0.12.6</version>
     	</dependency>
     	<dependency>
     <groupId>io.jsonwebtoken</groupId>
     <artifactId>jjwt-impl</artifactId>
-    <version>0.11.5</version>
+    <version>0.12.6</version>
     <scope>runtime</scope>
 </dependency>
 
 <dependency>
     <groupId>io.jsonwebtoken</groupId>
     <artifactId>jjwt-jackson</artifactId>
-    <version>0.11.5</version>
+    <version>0.12.6</version>
     <scope>runtime</scope>
 </dependency>
 	</dependencies>

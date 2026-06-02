@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -126,8 +128,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public OrderResponse getById(Long id) {
-        return toOrderResponse(findOrThrow(id));
+    public OrderResponse getById(Long restaurantId, Long id) {
+        Order order = findOrThrow(id);
+        if (!order.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Order", id);
+        }
+        return toOrderResponse(order);
     }
 
     @Override
@@ -137,8 +143,7 @@ public class OrderServiceImpl implements OrderService {
         // evitando duplicados en la secuencia del folio
         var restaurant = restaurantRepo.findByIdWithLock(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
-        var employee = employeeRepo.findById(request.getEmployeeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
+        var employee = resolveAuthenticatedEmployee();
 
         Order order = new Order();
         order.setRestaurant(restaurant);
@@ -153,9 +158,6 @@ public class OrderServiceImpl implements OrderService {
             order.setPaymentMethod(parseEnum(PaymentMethod.class, request.getPaymentMethod(), "payment_method"));
         }
         order.setNotes(request.getNotes());
-        if (request.getCreatedAt() != null) {
-            order.setCreatedAt(request.getCreatedAt());
-        }
 
         // Cliente y repartidor opcionales
         if (request.getCustomerId() != null) {
@@ -195,11 +197,13 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public OrderResponse updateStatus(Long id, OrderStatusUpdateRequest request) {
+    public OrderResponse updateStatus(Long restaurantId, Long id, OrderStatusUpdateRequest request) {
         log.info(">>> OrderServiceImpl.updateStatus llamado. orderId={}, toStatus={}", id, request.getToStatus());
         Order order = findOrThrow(id);
-        var employee = employeeRepo.findById(request.getEmployeeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
+        if (!order.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Order", id);
+        }
+        var employee = resolveAuthenticatedEmployee();
 
         OrderStatus newStatus = parseEnum(OrderStatus.class, request.getToStatus(), "status");
         OrderStatus currentStatus = order.getStatus();
@@ -236,7 +240,7 @@ public class OrderServiceImpl implements OrderService {
         if (newStatus == OrderStatus.DELIVERED) {
             log.info("Iniciando auto-creación de venta para orden {}", order.getFolio());
             try {
-                saleService.createFromOrder(order.getId(), request.getEmployeeId());
+                saleService.createFromOrder(order.getId(), employee.getId());
             } catch (Exception e) {
                 log.error("Error en auto-creación de venta para orden {}: {}", order.getFolio(), e.getMessage(), e);
             }
@@ -248,17 +252,22 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderStatusHistoryResponse> getHistory(Long orderId) {
-        findOrThrow(orderId);
+    public List<OrderStatusHistoryResponse> getHistory(Long restaurantId, Long orderId) {
+        Order order = findOrThrow(orderId);
+        if (!order.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Order", orderId);
+        }
         return historyRepo.findByOrderIdOrderByChangedAtAsc(orderId)
                 .stream().map(mapper::toHistoryResponse).toList();
     }
 
     @Override
-    public PaymentResponse addPayment(Long orderId, PaymentRequest request) {
+    public PaymentResponse addPayment(Long restaurantId, Long orderId, PaymentRequest request) {
         Order order = findOrThrow(orderId);
-        var registeredBy = employeeRepo.findById(request.getRegisteredBy())
-                .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getRegisteredBy()));
+        if (!order.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Order", orderId);
+        }
+        var registeredBy = resolveAuthenticatedEmployee();
 
         Payment payment = new Payment();
         payment.setOrder(order);
@@ -426,6 +435,12 @@ public class OrderServiceImpl implements OrderService {
         } catch (IllegalArgumentException e) {
             throw new BusinessRuleException("Valor inválido para " + fieldName + ": " + value);
         }
+    }
+
+    private Employee resolveAuthenticatedEmployee() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return employeeRepo.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Empleado autenticado no encontrado: " + username));
     }
 
     private Order findOrThrow(Long id) {
