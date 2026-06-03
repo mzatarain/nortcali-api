@@ -14,6 +14,7 @@ import com.nortcali.api.repository.SupplyRepository;
 import com.nortcali.api.service.InventoryMovementService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -47,6 +48,7 @@ public class InventoryMovementServiceImpl implements InventoryMovementService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public InventoryMovementResponse register(Long supplyId, InventoryMovementRequest request) {
         Supply supply = supplyRepo.findById(supplyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Supply", supplyId));
