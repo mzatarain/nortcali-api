@@ -1,41 +1,44 @@
 # ─── Stage 1: Build ───────────────────────────────────────────────────────────
-# Compila el JAR con Maven y Java 21
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 
-# Copiar el wrapper y el pom primero para aprovechar la caché de capas de Docker:
-# si solo cambia código fuente (no dependencias), esta capa no se re-ejecuta.
+# Copiar wrapper y pom primero para aprovechar caché de capas:
+# si solo cambia código fuente, esta capa no se re-ejecuta.
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
 
 RUN chmod +x mvnw && ./mvnw dependency:go-offline -q
 
-# Copiar fuentes y compilar
 COPY src ./src
 RUN ./mvnw clean package -DskipTests -q
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
-# Imagen mínima JRE 21 sin herramientas de desarrollo
 FROM eclipse-temurin:21-jre-alpine AS runtime
 
 WORKDIR /app
 
-# Usuario no-root para mayor seguridad
+# Usuario no-root
 RUN addgroup -S nortcali && adduser -S nortcali -G nortcali
-
-# Directorio para logs del perfil prod
 RUN mkdir -p logs && chown -R nortcali:nortcali /app
 
 USER nortcali
 
 COPY --from=builder /app/target/*.jar app.jar
 
+# Perfil prod por defecto — docker-compose puede sobreescribirlo.
+# PRODUCTION_ENV activa el guard de arranque en NortcaliApiApplication.
+ENV SPRING_PROFILES_ACTIVE=prod
+ENV PRODUCTION_ENV=true
+
 EXPOSE 8082
 
-# Health check usando el endpoint de Actuator
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD wget -qO- http://localhost:8082/actuator/health || exit 1
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", \
+    "-Djava.security.egd=file:/dev/./urandom", \
+    "-XX:+UseContainerSupport", \
+    "-XX:MaxRAMPercentage=75.0", \
+    "-jar", "app.jar"]
