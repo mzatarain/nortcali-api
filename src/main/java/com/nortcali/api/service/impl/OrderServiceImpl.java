@@ -179,9 +179,11 @@ public class OrderServiceImpl implements OrderService {
         order.getItems().addAll(items);
 
         // Generar folio: ORD-{restaurantId}-{yyyyMMdd}-{secuencia}
+        // MAX en vez de COUNT para que hard-deletes no provoquen colisión de folio
         LocalDate today = LocalDate.now(ZoneId.of(restaurant.getTimezone()));
         String prefix = FolioGenerator.folioPrefix(restaurantId, today) + "%";
-        long sequence = orderRepo.countByFolioPrefix(restaurantId, prefix) + 1;
+        Integer maxSeq = orderRepo.findMaxSequenceByFolioPrefix(restaurantId, prefix);
+        long sequence = (maxSeq != null ? maxSeq : 0) + 1;
         order.setFolio(FolioGenerator.generateOrderFolio(restaurantId, today, sequence));
 
         Order saved = orderRepo.save(order);

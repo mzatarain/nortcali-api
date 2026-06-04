@@ -30,9 +30,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT o FROM Order o WHERE o.restaurant.id = :r AND o.status IN :statuses AND o.createdAt >= :start AND o.createdAt < :end ORDER BY o.createdAt DESC")
     Page<Order> findByRestaurantAndStatusInAndDate(@Param("r") Long restaurantId, @Param("statuses") List<OrderStatus> statuses, @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
 
-    // Cuenta por prefijo de folio en lugar de CAST(createdAt) para evitar problemas de zona horaria
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.restaurant.id = :restaurantId AND o.folio LIKE :folioPrefix")
-    long countByFolioPrefix(@Param("restaurantId") Long restaurantId, @Param("folioPrefix") String folioPrefix);
+    // MAX sobre el número de secuencia del folio para que hard-deletes no rompan la secuencia
+    @Query(value = "SELECT MAX(CAST(SUBSTRING_INDEX(folio, '-', -1) AS UNSIGNED)) " +
+                   "FROM orders WHERE restaurant_id = :restaurantId AND folio LIKE :folioPrefix",
+           nativeQuery = true)
+    Integer findMaxSequenceByFolioPrefix(@Param("restaurantId") Long restaurantId, @Param("folioPrefix") String folioPrefix);
 
     @Query("SELECT o FROM Order o WHERE o.restaurant.id = :r AND o.status IN :statuses AND o.createdAt >= :start AND o.createdAt < :end")
     List<Order> findActiveOrdersForDay(@Param("r") Long restaurantId,
