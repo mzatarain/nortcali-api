@@ -144,7 +144,7 @@ class OrderServiceImplTest {
         when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
         when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(menuItemRepo.findById(menuItemId)).thenReturn(Optional.of(menuItem(menuItemId, "Burrito")));
-        when(orderRepo.countByFolioPrefix(eq(restaurantId), anyString())).thenReturn(0L);
+        when(orderRepo.findMaxSequenceByFolioPrefix(eq(restaurantId), anyString())).thenReturn(null);
 
         // El save devuelve la misma orden que le entra (con id simulado)
         when(orderRepo.save(any(Order.class))).thenAnswer(invocation -> {
@@ -189,7 +189,7 @@ class OrderServiceImplTest {
         when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L, "Tacos")));
         when(menuItemRepo.findById(11L)).thenReturn(Optional.of(menuItem(11L, "Refresco")));
-        when(orderRepo.countByFolioPrefix(eq(restaurantId), anyString())).thenReturn(3L);
+        when(orderRepo.findMaxSequenceByFolioPrefix(eq(restaurantId), anyString())).thenReturn(3);
         when(orderRepo.save(any(Order.class))).thenAnswer(inv -> { Order o = inv.getArgument(0); o.setId(1L); return o; });
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
         when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
