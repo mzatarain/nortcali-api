@@ -44,16 +44,18 @@ public class EmployeeController {
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    @PutMapping("/employees/{id}")
-    public ResponseEntity<EmployeeResponse> update(@PathVariable Long id,
+    @PutMapping("/restaurants/{restaurantId}/employees/{id}")
+    public ResponseEntity<EmployeeResponse> update(@PathVariable Long restaurantId,
+                                                   @PathVariable Long id,
                                                    @Valid @RequestBody EmployeeRequest request) {
-        return ResponseEntity.ok(employeeService.update(id, request));
+        return ResponseEntity.ok(employeeService.update(restaurantId, id, request));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    @PutMapping("/employees/{id}/status")
-    public ResponseEntity<EmployeeResponse> updateStatus(@PathVariable Long id,
+    @PutMapping("/restaurants/{restaurantId}/employees/{id}/status")
+    public ResponseEntity<EmployeeResponse> updateStatus(@PathVariable Long restaurantId,
+                                                         @PathVariable Long id,
                                                          @Valid @RequestBody EmployeeStatusRequest request) {
-        return ResponseEntity.ok(employeeService.updateStatus(id, request));
+        return ResponseEntity.ok(employeeService.updateStatus(restaurantId, id, request));
     }
 }

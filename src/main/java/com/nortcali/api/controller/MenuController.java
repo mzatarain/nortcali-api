@@ -116,35 +116,40 @@ public class MenuController {
      * VARIANTS
      * ===================== */
 
-    @GetMapping("/menu-items/{itemId}/variants")
-    public ResponseEntity<List<MenuItemVariantResponse>> getVariants(@PathVariable Long itemId) {
-        return ResponseEntity.ok(variantService.getByMenuItem(itemId));
+    @GetMapping("/restaurants/{restaurantId}/menu-items/{itemId}/variants")
+    public ResponseEntity<List<MenuItemVariantResponse>> getVariants(@PathVariable Long restaurantId,
+                                                                      @PathVariable Long itemId) {
+        return ResponseEntity.ok(variantService.getByMenuItem(restaurantId, itemId));
     }
 
-    @GetMapping("/menu-items/{itemId}/variants/{variantId}")
-    public ResponseEntity<MenuItemVariantResponse> getVariantById(@PathVariable Long itemId,
+    @GetMapping("/restaurants/{restaurantId}/menu-items/{itemId}/variants/{variantId}")
+    public ResponseEntity<MenuItemVariantResponse> getVariantById(@PathVariable Long restaurantId,
+                                                                   @PathVariable Long itemId,
                                                                    @PathVariable Long variantId) {
-        return ResponseEntity.ok(variantService.getById(variantId));
+        return ResponseEntity.ok(variantService.getById(restaurantId, variantId));
     }
 
-    @PostMapping("/menu-items/{itemId}/variants")
-    public ResponseEntity<MenuItemVariantResponse> createVariant(@PathVariable Long itemId,
+    @PostMapping("/restaurants/{restaurantId}/menu-items/{itemId}/variants")
+    public ResponseEntity<MenuItemVariantResponse> createVariant(@PathVariable Long restaurantId,
+                                                                  @PathVariable Long itemId,
                                                                   @Valid @RequestBody MenuItemVariantRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(variantService.create(itemId, request));
+                .body(variantService.create(restaurantId, itemId, request));
     }
 
-    @PutMapping("/menu-items/{itemId}/variants/{variantId}")
-    public ResponseEntity<MenuItemVariantResponse> updateVariant(@PathVariable Long itemId,
+    @PutMapping("/restaurants/{restaurantId}/menu-items/{itemId}/variants/{variantId}")
+    public ResponseEntity<MenuItemVariantResponse> updateVariant(@PathVariable Long restaurantId,
+                                                                  @PathVariable Long itemId,
                                                                   @PathVariable Long variantId,
                                                                   @Valid @RequestBody MenuItemVariantRequest request) {
-        return ResponseEntity.ok(variantService.update(variantId, request));
+        return ResponseEntity.ok(variantService.update(restaurantId, variantId, request));
     }
 
-    @DeleteMapping("/menu-items/{itemId}/variants/{variantId}")
-    public ResponseEntity<Void> deactivateVariant(@PathVariable Long itemId,
+    @DeleteMapping("/restaurants/{restaurantId}/menu-items/{itemId}/variants/{variantId}")
+    public ResponseEntity<Void> deactivateVariant(@PathVariable Long restaurantId,
+                                                   @PathVariable Long itemId,
                                                    @PathVariable Long variantId) {
-        variantService.deactivate(variantId);
+        variantService.deactivate(restaurantId, variantId);
         return ResponseEntity.noContent().build();
     }
 
@@ -152,19 +157,22 @@ public class MenuController {
      * RECIPE
      * ===================== */
 
-    @GetMapping("/menu-items/{itemId}/recipe")
-    public ResponseEntity<RecipeResponse> getRecipe(@PathVariable Long itemId) {
-        return ResponseEntity.ok(recipeService.getByMenuItem(itemId));
+    @GetMapping("/restaurants/{restaurantId}/menu-items/{itemId}/recipe")
+    public ResponseEntity<RecipeResponse> getRecipe(@PathVariable Long restaurantId,
+                                                     @PathVariable Long itemId) {
+        return ResponseEntity.ok(recipeService.getByMenuItem(restaurantId, itemId));
     }
 
-    @GetMapping("/menu-items/{itemId}/recipes")
-    public ResponseEntity<List<RecipeResponse>> getAllRecipes(@PathVariable Long itemId) {
-        return ResponseEntity.ok(recipeService.getAllByMenuItem(itemId));
+    @GetMapping("/restaurants/{restaurantId}/menu-items/{itemId}/recipes")
+    public ResponseEntity<List<RecipeResponse>> getAllRecipes(@PathVariable Long restaurantId,
+                                                               @PathVariable Long itemId) {
+        return ResponseEntity.ok(recipeService.getAllByMenuItem(restaurantId, itemId));
     }
 
-    @PostMapping("/menu-items/{itemId}/recipe")
-    public ResponseEntity<RecipeResponse> createOrUpdateRecipe(@PathVariable Long itemId,
+    @PostMapping("/restaurants/{restaurantId}/menu-items/{itemId}/recipe")
+    public ResponseEntity<RecipeResponse> createOrUpdateRecipe(@PathVariable Long restaurantId,
+                                                               @PathVariable Long itemId,
                                                                @Valid @RequestBody RecipeRequest request) {
-        return ResponseEntity.ok(recipeService.createOrUpdate(itemId, request));
+        return ResponseEntity.ok(recipeService.createOrUpdate(restaurantId, itemId, request));
     }
 }

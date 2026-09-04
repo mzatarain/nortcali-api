@@ -2,6 +2,7 @@ package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.RecipeRequest;
 import com.nortcali.api.dto.response.RecipeResponse;
+import com.nortcali.api.entity.MenuItem;
 import com.nortcali.api.entity.Recipe;
 import com.nortcali.api.entity.RecipeIngredient;
 import com.nortcali.api.exception.ResourceNotFoundException;
@@ -44,7 +45,8 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional(readOnly = true)
-    public RecipeResponse getByMenuItem(Long menuItemId) {
+    public RecipeResponse getByMenuItem(Long restaurantId, Long menuItemId) {
+        requireMenuItemInRestaurant(restaurantId, menuItemId);
         Recipe recipe = recipeRepo.findByMenuItemIdAndIsActiveTrue(menuItemId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Receta activa no encontrada para el platillo con id " + menuItemId));
@@ -53,7 +55,8 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RecipeResponse> getAllByMenuItem(Long menuItemId) {
+    public List<RecipeResponse> getAllByMenuItem(Long restaurantId, Long menuItemId) {
+        requireMenuItemInRestaurant(restaurantId, menuItemId);
         return recipeRepo.findAllByMenuItemIdAndIsActiveTrue(menuItemId)
                 .stream()
                 .map(mapper::toResponse)
@@ -61,9 +64,8 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
-    public RecipeResponse createOrUpdate(Long menuItemId, RecipeRequest request) {
-        var menuItem = menuItemRepo.findById(menuItemId)
-                .orElseThrow(() -> new ResourceNotFoundException("MenuItem", menuItemId));
+    public RecipeResponse createOrUpdate(Long restaurantId, Long menuItemId, RecipeRequest request) {
+        var menuItem = requireMenuItemInRestaurant(restaurantId, menuItemId);
 
         // Buscar receta existente (con o sin variante)
         Recipe recipe;
@@ -92,6 +94,15 @@ public class RecipeServiceImpl implements RecipeService {
 
         log.info("Guardando receta para platillo {} con {} ingredientes", menuItemId, ingredients.size());
         return mapper.toResponse(recipeRepo.save(recipe));
+    }
+
+    private MenuItem requireMenuItemInRestaurant(Long restaurantId, Long menuItemId) {
+        var menuItem = menuItemRepo.findById(menuItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("MenuItem", menuItemId));
+        if (!menuItem.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("MenuItem", menuItemId);
+        }
+        return menuItem;
     }
 
     private List<RecipeIngredient> buildIngredients(RecipeRequest request, Recipe recipe) {

@@ -42,16 +42,25 @@ public class InventoryMovementServiceImpl implements InventoryMovementService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<InventoryMovementResponse> getBySupply(Long supplyId) {
+    public List<InventoryMovementResponse> getBySupply(Long restaurantId, Long supplyId) {
+        Supply supply = supplyRepo.findById(supplyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Supply", supplyId));
+        if (!supply.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Supply", supplyId);
+        }
         return movementRepo.findBySupplyIdOrderByCreatedAtDesc(supplyId)
                 .stream().map(mapper::toResponse).toList();
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public InventoryMovementResponse register(Long supplyId, InventoryMovementRequest request) {
+    public InventoryMovementResponse register(Long restaurantId, Long supplyId, InventoryMovementRequest request) {
         Supply supply = supplyRepo.findById(supplyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Supply", supplyId));
+
+        if (!supply.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Supply", supplyId);
+        }
 
         if (!supply.isActive()) {
             throw new BusinessRuleException("El insumo está inactivo y no puede recibir movimientos");

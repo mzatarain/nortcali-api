@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface VariantModifierService {
 
-    List<VariantModifierResponse> getByVariant(Long variantId);
-    VariantModifierResponse add(Long variantId, VariantModifierRequest request);
-    void remove(Long variantId, Long modifierId);
+    List<VariantModifierResponse> getByVariant(Long restaurantId, Long variantId);
+    VariantModifierResponse add(Long restaurantId, Long variantId, VariantModifierRequest request);
+    void remove(Long restaurantId, Long variantId, Long modifierId);
 }

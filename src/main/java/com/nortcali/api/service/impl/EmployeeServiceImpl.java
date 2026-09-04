@@ -93,8 +93,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    public EmployeeResponse update(Long id, EmployeeRequest request) {
+    public EmployeeResponse update(Long restaurantId, Long id, EmployeeRequest request) {
         Employee employee = findOrThrow(id);
+        if (!employee.getRestaurantId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Employee", id);
+        }
         employee.setFirstName(request.getFirstName());
         employee.setLastName(request.getLastName());
         employee.setPhone(request.getPhone());
@@ -111,8 +114,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    public EmployeeResponse updateStatus(Long id, EmployeeStatusRequest request) {
+    public EmployeeResponse updateStatus(Long restaurantId, Long id, EmployeeStatusRequest request) {
         Employee employee = findOrThrow(id);
+        if (!employee.getRestaurantId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Employee", id);
+        }
         employee.setStatus(request.getStatus());
         log.info("Empleado {} cambió status a {}", id, request.getStatus());
         return mapper.toResponse(employeeRepo.save(employee));

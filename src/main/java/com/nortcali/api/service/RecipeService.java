@@ -7,9 +7,9 @@ import java.util.List;
 
 public interface RecipeService {
 
-    RecipeResponse getByMenuItem(Long menuItemId);
+    RecipeResponse getByMenuItem(Long restaurantId, Long menuItemId);
 
-    List<RecipeResponse> getAllByMenuItem(Long menuItemId);
+    List<RecipeResponse> getAllByMenuItem(Long restaurantId, Long menuItemId);
 
-    RecipeResponse createOrUpdate(Long menuItemId, RecipeRequest request);
+    RecipeResponse createOrUpdate(Long restaurantId, Long menuItemId, RecipeRequest request);
 }

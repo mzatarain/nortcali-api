@@ -8,7 +8,7 @@ public interface CashSessionService {
 
     CashSessionResponse open(Long restaurantId, OpenCashSessionRequest request);
 
-    CashSessionResponse close(Long sessionId, CloseCashSessionRequest request);
+    CashSessionResponse close(Long restaurantId, Long sessionId, CloseCashSessionRequest request);
 
     CashSessionResponse getCurrent(Long restaurantId);
 }

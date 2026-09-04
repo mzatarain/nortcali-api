@@ -2,6 +2,7 @@ package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.VariantModifierRequest;
 import com.nortcali.api.dto.response.VariantModifierResponse;
+import com.nortcali.api.entity.MenuItemVariant;
 import com.nortcali.api.entity.VariantModifier;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
@@ -37,15 +38,15 @@ public class VariantModifierServiceImpl implements VariantModifierService {
     }
 
     @Override @Transactional(readOnly = true)
-    public List<VariantModifierResponse> getByVariant(Long variantId) {
+    public List<VariantModifierResponse> getByVariant(Long restaurantId, Long variantId) {
+        requireVariantInRestaurant(restaurantId, variantId);
         return vmRepo.findByVariantId(variantId).stream()
                 .map(mapper::toVariantModifierResponse).toList();
     }
 
     @Override
-    public VariantModifierResponse add(Long variantId, VariantModifierRequest request) {
-        var variant = variantRepo.findById(variantId)
-                .orElseThrow(() -> new ResourceNotFoundException("MenuItemVariant", variantId));
+    public VariantModifierResponse add(Long restaurantId, Long variantId, VariantModifierRequest request) {
+        var variant = requireVariantInRestaurant(restaurantId, variantId);
         var modifier = modifierRepo.findById(request.getModifierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Modifier", request.getModifierId()));
 
@@ -61,10 +62,20 @@ public class VariantModifierServiceImpl implements VariantModifierService {
     }
 
     @Override
-    public void remove(Long variantId, Long modifierId) {
+    public void remove(Long restaurantId, Long variantId, Long modifierId) {
+        requireVariantInRestaurant(restaurantId, variantId);
         if (vmRepo.findByVariantIdAndModifierId(variantId, modifierId).isEmpty()) {
             throw new ResourceNotFoundException("VariantModifier", modifierId);
         }
         vmRepo.deleteByVariantIdAndModifierId(variantId, modifierId);
+    }
+
+    private MenuItemVariant requireVariantInRestaurant(Long restaurantId, Long variantId) {
+        var variant = variantRepo.findById(variantId)
+                .orElseThrow(() -> new ResourceNotFoundException("MenuItemVariant", variantId));
+        if (!variant.getMenuItem().getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("MenuItemVariant", variantId);
+        }
+        return variant;
     }
 }

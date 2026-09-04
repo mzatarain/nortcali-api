@@ -74,9 +74,13 @@ public class CashSessionServiceImpl implements CashSessionService {
     }
 
     @Override
-    public CashSessionResponse close(Long sessionId, CloseCashSessionRequest request) {
+    public CashSessionResponse close(Long restaurantId, Long sessionId, CloseCashSessionRequest request) {
         CashSession session = sessionRepo.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("CashSession", sessionId));
+
+        if (!session.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("CashSession", sessionId);
+        }
 
         if (session.getStatus() != CashSessionStatus.OPEN) {
             throw new BusinessRuleException("La sesión de caja no está abierta");
@@ -86,7 +90,6 @@ public class CashSessionServiceImpl implements CashSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getClosedBy()));
 
         LocalDate today = LocalDate.now(ZoneId.of(session.getRestaurant().getTimezone()));
-        Long restaurantId = session.getRestaurant().getId();
 
         // Calcular totales del día
         BigDecimal totalSales = saleRepo.sumByRestaurantAndPeriod(restaurantId, today, today);

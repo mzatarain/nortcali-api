@@ -28,10 +28,11 @@ public class CashSessionController {
                 .body(cashSessionService.open(restaurantId, request));
     }
 
-    @PostMapping("/cash-sessions/{id}/close")
-    public ResponseEntity<CashSessionResponse> close(@PathVariable Long id,
+    @PostMapping("/restaurants/{restaurantId}/cash-sessions/{id}/close")
+    public ResponseEntity<CashSessionResponse> close(@PathVariable Long restaurantId,
+                                                      @PathVariable Long id,
                                                       @Valid @RequestBody CloseCashSessionRequest request) {
-        return ResponseEntity.ok(cashSessionService.close(id, request));
+        return ResponseEntity.ok(cashSessionService.close(restaurantId, id, request));
     }
 
     @GetMapping("/restaurants/{restaurantId}/cash-sessions/current")

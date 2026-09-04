@@ -340,16 +340,16 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - `GET/POST/PUT/DELETE /api/v1/restaurants`
 
 ### Empleados
-- `GET/POST /api/v1/restaurants/{restaurantId}/employees`
-- `GET/PUT  /api/v1/employees/{id}`
-- `PUT      /api/v1/employees/{id}/status`
+- `GET/POST         /api/v1/restaurants/{restaurantId}/employees`
+- `GET/PUT          /api/v1/restaurants/{restaurantId}/employees/{id}`
+- `PUT              /api/v1/restaurants/{restaurantId}/employees/{id}/status`
 
 ### Menú
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/menu/categories`
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/menu/items`
-- `GET/POST/PUT/DELETE /api/v1/menu-items/{itemId}/variants`
-- `GET/POST            /api/v1/menu-items/{itemId}/recipe` — receta base del ítem (sin variante)
-- `GET                 /api/v1/menu-items/{itemId}/recipes` — todas las recetas activas del ítem (base + por variante)
+- `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/menu-items/{itemId}/variants`
+- `GET/POST            /api/v1/restaurants/{restaurantId}/menu-items/{itemId}/recipe` — receta base del ítem (sin variante)
+- `GET                 /api/v1/restaurants/{restaurantId}/menu-items/{itemId}/recipes` — todas las recetas activas del ítem (base + por variante)
 
 ### Unidades de medida
 - `GET/POST/PUT        /api/v1/units`
@@ -360,7 +360,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/supplies`
 - `GET/PUT/DELETE      /api/v1/restaurants/{restaurantId}/supplies/{id}`
 - `GET                 /api/v1/restaurants/{restaurantId}/supplies/low-stock`
-- `GET/POST            /api/v1/supplies/{supplyId}/movements`
+- `GET/POST            /api/v1/restaurants/{restaurantId}/supplies/{supplyId}/movements`
 
 ### Clientes
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/customers`
@@ -402,8 +402,8 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 ### Modificadores
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/modifier-groups`
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/modifier-groups/{groupId}/modifiers`
-- `GET/POST            /api/v1/menu-item-variants/{variantId}/modifiers`
-- `DELETE              /api/v1/menu-item-variants/{variantId}/modifiers/{modifierId}`
+- `GET/POST            /api/v1/restaurants/{restaurantId}/menu-item-variants/{variantId}/modifiers`
+- `DELETE              /api/v1/restaurants/{restaurantId}/menu-item-variants/{variantId}/modifiers/{modifierId}`
 
 ### Combos
 - `GET/POST/PUT/DELETE /api/v1/restaurants/{restaurantId}/combos`
@@ -415,7 +415,7 @@ Todos los módulos están implementados (entities + repos + DTOs + mappers + ser
 
 ### Caja
 - `POST /api/v1/restaurants/{restaurantId}/cash-sessions/open`
-- `POST /api/v1/cash-sessions/{id}/close`
+- `POST /api/v1/restaurants/{restaurantId}/cash-sessions/{id}/close`
 - `GET  /api/v1/restaurants/{restaurantId}/cash-sessions/current`
 
 ### Financiero

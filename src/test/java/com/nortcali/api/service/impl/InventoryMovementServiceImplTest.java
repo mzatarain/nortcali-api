@@ -4,6 +4,7 @@ import com.nortcali.api.dto.request.InventoryMovementRequest;
 import com.nortcali.api.dto.response.InventoryMovementResponse;
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.InventoryMovement;
+import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.entity.Supply;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
@@ -39,7 +40,12 @@ class InventoryMovementServiceImplTest {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    private static final Long RESTAURANT_ID = 100L;
+
     private Supply supplyWith(BigDecimal current, BigDecimal minimum) {
+        Restaurant restaurant = new Restaurant();
+        restaurant.setId(RESTAURANT_ID);
+
         Supply s = new Supply();
         s.setId(1L);
         s.setName("Harina");
@@ -47,6 +53,7 @@ class InventoryMovementServiceImplTest {
         s.setCurrentStock(current);
         s.setMinimumStock(minimum);
         s.setUnitCost(new BigDecimal("10.00"));
+        s.setRestaurant(restaurant);
         return s;
     }
 
@@ -75,7 +82,7 @@ class InventoryMovementServiceImplTest {
         when(movementRepo.save(any())).thenReturn(saved);
         when(mapper.toResponse(saved)).thenReturn(mock(InventoryMovementResponse.class));
 
-        service.register(1L, request("entrada", new BigDecimal("3.0")));
+        service.register(RESTAURANT_ID, 1L, request("entrada", new BigDecimal("3.0")));
 
         // stock = 5 + 3 = 8
         ArgumentCaptor<Supply> captor = ArgumentCaptor.forClass(Supply.class);
@@ -93,7 +100,7 @@ class InventoryMovementServiceImplTest {
         when(movementRepo.save(any())).thenReturn(new InventoryMovement());
         when(mapper.toResponse(any())).thenReturn(mock(InventoryMovementResponse.class));
 
-        service.register(1L, request("salida", new BigDecimal("4.0")));
+        service.register(RESTAURANT_ID, 1L, request("salida", new BigDecimal("4.0")));
 
         // stock = 10 - 4 = 6
         ArgumentCaptor<Supply> captor = ArgumentCaptor.forClass(Supply.class);
@@ -106,7 +113,7 @@ class InventoryMovementServiceImplTest {
         Supply supply = supplyWith(new BigDecimal("2.0"), new BigDecimal("1.0"));
         when(supplyRepo.findById(1L)).thenReturn(Optional.of(supply));
 
-        assertThatThrownBy(() -> service.register(1L, request("salida", new BigDecimal("5.0"))))
+        assertThatThrownBy(() -> service.register(RESTAURANT_ID, 1L, request("salida", new BigDecimal("5.0"))))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Stock insuficiente");
 
@@ -123,7 +130,7 @@ class InventoryMovementServiceImplTest {
         when(movementRepo.save(any())).thenReturn(new InventoryMovement());
         when(mapper.toResponse(any())).thenReturn(mock(InventoryMovementResponse.class));
 
-        service.register(1L, request("merma", new BigDecimal("3.0")));
+        service.register(RESTAURANT_ID, 1L, request("merma", new BigDecimal("3.0")));
 
         // stock = 8 - 3 = 5
         ArgumentCaptor<Supply> captor = ArgumentCaptor.forClass(Supply.class);
@@ -141,7 +148,7 @@ class InventoryMovementServiceImplTest {
         when(movementRepo.save(any())).thenReturn(new InventoryMovement());
         when(mapper.toResponse(any())).thenReturn(mock(InventoryMovementResponse.class));
 
-        service.register(1L, request("ajuste", new BigDecimal("7.5")));
+        service.register(RESTAURANT_ID, 1L, request("ajuste", new BigDecimal("7.5")));
 
         // stock = 7.5 (reemplazado, no sumado/restado)
         ArgumentCaptor<Supply> captor = ArgumentCaptor.forClass(Supply.class);
@@ -161,7 +168,7 @@ class InventoryMovementServiceImplTest {
         when(mapper.toResponse(any())).thenReturn(mock(InventoryMovementResponse.class));
 
         // no debe lanzar excepción; solo loguea warn
-        service.register(1L, request("salida", new BigDecimal("3.0")));
+        service.register(RESTAURANT_ID, 1L, request("salida", new BigDecimal("3.0")));
 
         ArgumentCaptor<Supply> captor = ArgumentCaptor.forClass(Supply.class);
         verify(supplyRepo).save(captor.capture());
@@ -176,7 +183,7 @@ class InventoryMovementServiceImplTest {
         supply.setActive(false);
         when(supplyRepo.findById(1L)).thenReturn(Optional.of(supply));
 
-        assertThatThrownBy(() -> service.register(1L, request("entrada", new BigDecimal("1.0"))))
+        assertThatThrownBy(() -> service.register(RESTAURANT_ID, 1L, request("entrada", new BigDecimal("1.0"))))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("inactivo");
     }
@@ -188,7 +195,7 @@ class InventoryMovementServiceImplTest {
         Supply supply = supplyWith(new BigDecimal("10.0"), new BigDecimal("2.0"));
         when(supplyRepo.findById(1L)).thenReturn(Optional.of(supply));
 
-        assertThatThrownBy(() -> service.register(1L, request("invalido", new BigDecimal("1.0"))))
+        assertThatThrownBy(() -> service.register(RESTAURANT_ID, 1L, request("invalido", new BigDecimal("1.0"))))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Tipo de movimiento inválido");
     }
@@ -199,7 +206,7 @@ class InventoryMovementServiceImplTest {
     void register_insumoNoEncontrado_lanzaResourceNotFoundException() {
         when(supplyRepo.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.register(99L, request("entrada", new BigDecimal("1.0"))))
+        assertThatThrownBy(() -> service.register(RESTAURANT_ID, 99L, request("entrada", new BigDecimal("1.0"))))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

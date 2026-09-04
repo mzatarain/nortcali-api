@@ -401,23 +401,24 @@ public class OrderServiceImpl implements OrderService {
      * Si el stock cae bajo el mínimo se loguea una alerta pero no se bloquea.
      */
     private void deductInventory(Order order) {
+        Long restaurantId = order.getRestaurant().getId();
         for (OrderItem item : order.getItems()) {
             Long menuItemId = item.getMenuItem().getId();
             Long employeeId = order.getEmployee().getId();
 
             // Receta base (variant_id IS NULL)
             recipeRepo.findByMenuItemIdAndVariantIdIsNullAndIsActiveTrue(menuItemId)
-                    .ifPresent(r -> deductRecipeIngredients(r, item.getQuantity(), employeeId, order.getFolio()));
+                    .ifPresent(r -> deductRecipeIngredients(restaurantId, r, item.getQuantity(), employeeId, order.getFolio()));
 
             // Adiciones específicas de la variante pedida
             if (item.getVariant() != null) {
                 recipeRepo.findByMenuItemIdAndVariantIdAndIsActiveTrue(menuItemId, item.getVariant().getId())
-                        .ifPresent(r -> deductRecipeIngredients(r, item.getQuantity(), employeeId, order.getFolio()));
+                        .ifPresent(r -> deductRecipeIngredients(restaurantId, r, item.getQuantity(), employeeId, order.getFolio()));
             }
         }
     }
 
-    private void deductRecipeIngredients(Recipe recipe, int quantity, Long employeeId, String folio) {
+    private void deductRecipeIngredients(Long restaurantId, Recipe recipe, int quantity, Long employeeId, String folio) {
         for (RecipeIngredient ingredient : recipe.getIngredients()) {
             BigDecimal totalQty = ingredient.getQuantity()
                     .multiply(BigDecimal.valueOf(quantity));
@@ -426,7 +427,7 @@ public class OrderServiceImpl implements OrderService {
             movReq.setQuantity(totalQty);
             movReq.setEmployeeId(employeeId);
             try {
-                inventoryService.register(ingredient.getSupply().getId(), movReq);
+                inventoryService.register(restaurantId, ingredient.getSupply().getId(), movReq);
             } catch (Exception e) {
                 log.warn("No se pudo descontar insumo {} para orden {}: {}",
                         ingredient.getSupply().getId(), folio, e.getMessage());

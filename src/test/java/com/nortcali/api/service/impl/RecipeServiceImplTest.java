@@ -38,10 +38,16 @@ class RecipeServiceImplTest {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    private static final Long RESTAURANT_ID = 100L;
+
     private MenuItem menuItem(Long id) {
+        Restaurant restaurant = new Restaurant();
+        restaurant.setId(RESTAURANT_ID);
+
         MenuItem m = new MenuItem();
         m.setId(id);
         m.setName("Tacos");
+        m.setRestaurant(restaurant);
         return m;
     }
 
@@ -91,7 +97,7 @@ class RecipeServiceImplTest {
         when(recipeRepo.save(any(Recipe.class))).thenReturn(savedRecipe);
         when(mapper.toResponse(savedRecipe)).thenReturn(mock(RecipeResponse.class));
 
-        service.createOrUpdate(menuItemId, requestWith(1, 2L, qty, 3L));
+        service.createOrUpdate(RESTAURANT_ID, menuItemId, requestWith(1, 2L, qty, 3L));
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
         verify(recipeRepo).save(captor.capture());
@@ -123,7 +129,7 @@ class RecipeServiceImplTest {
         when(recipeRepo.save(any(Recipe.class))).thenReturn(existingRecipe);
         when(mapper.toResponse(existingRecipe)).thenReturn(mock(RecipeResponse.class));
 
-        service.createOrUpdate(menuItemId, requestWith(2, 2L, new BigDecimal("1.0"), 3L));
+        service.createOrUpdate(RESTAURANT_ID, menuItemId, requestWith(2, 2L, new BigDecimal("1.0"), 3L));
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
         verify(recipeRepo).save(captor.capture());
@@ -166,7 +172,7 @@ class RecipeServiceImplTest {
         when(recipeRepo.save(any(Recipe.class))).thenReturn(savedRecipe);
         when(mapper.toResponse(savedRecipe)).thenReturn(mock(RecipeResponse.class));
 
-        service.createOrUpdate(menuItemId, req);
+        service.createOrUpdate(RESTAURANT_ID, menuItemId, req);
 
         ArgumentCaptor<Recipe> captor = ArgumentCaptor.forClass(Recipe.class);
         verify(recipeRepo).save(captor.capture());
@@ -183,7 +189,7 @@ class RecipeServiceImplTest {
     void createOrUpdate_menuItemNoEncontrado_lanzaResourceNotFoundException() {
         when(menuItemRepo.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.createOrUpdate(99L, requestWith(1, 1L, BigDecimal.ONE, 1L)))
+        assertThatThrownBy(() -> service.createOrUpdate(RESTAURANT_ID, 99L, requestWith(1, 1L, BigDecimal.ONE, 1L)))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(recipeRepo, never()).save(any());
@@ -198,7 +204,7 @@ class RecipeServiceImplTest {
         when(recipeRepo.findByMenuItemIdAndIsActiveTrue(menuItemId)).thenReturn(Optional.empty());
         when(supplyRepo.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.createOrUpdate(menuItemId, requestWith(1, 99L, BigDecimal.ONE, 1L)))
+        assertThatThrownBy(() -> service.createOrUpdate(RESTAURANT_ID, menuItemId, requestWith(1, 99L, BigDecimal.ONE, 1L)))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(recipeRepo, never()).save(any());

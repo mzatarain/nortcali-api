@@ -7,13 +7,13 @@ import java.util.List;
 
 public interface MenuItemVariantService {
 
-    List<MenuItemVariantResponse> getByMenuItem(Long menuItemId);
+    List<MenuItemVariantResponse> getByMenuItem(Long restaurantId, Long menuItemId);
 
-    MenuItemVariantResponse getById(Long id);
+    MenuItemVariantResponse getById(Long restaurantId, Long id);
 
-    MenuItemVariantResponse create(Long menuItemId, MenuItemVariantRequest request);
+    MenuItemVariantResponse create(Long restaurantId, Long menuItemId, MenuItemVariantRequest request);
 
-    MenuItemVariantResponse update(Long id, MenuItemVariantRequest request);
+    MenuItemVariantResponse update(Long restaurantId, Long id, MenuItemVariantRequest request);
 
-    void deactivate(Long id);
+    void deactivate(Long restaurantId, Long id);
 }

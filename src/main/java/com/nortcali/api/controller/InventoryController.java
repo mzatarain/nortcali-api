@@ -73,15 +73,17 @@ public class InventoryController {
      * MOVEMENTS
      * ===================== */
 
-    @GetMapping("/supplies/{supplyId}/movements")
-    public ResponseEntity<List<InventoryMovementResponse>> getMovements(@PathVariable Long supplyId) {
-        return ResponseEntity.ok(movementService.getBySupply(supplyId));
+    @GetMapping("/restaurants/{restaurantId}/supplies/{supplyId}/movements")
+    public ResponseEntity<List<InventoryMovementResponse>> getMovements(@PathVariable Long restaurantId,
+                                                                        @PathVariable Long supplyId) {
+        return ResponseEntity.ok(movementService.getBySupply(restaurantId, supplyId));
     }
 
-    @PostMapping("/supplies/{supplyId}/movements")
-    public ResponseEntity<InventoryMovementResponse> registerMovement(@PathVariable Long supplyId,
+    @PostMapping("/restaurants/{restaurantId}/supplies/{supplyId}/movements")
+    public ResponseEntity<InventoryMovementResponse> registerMovement(@PathVariable Long restaurantId,
+                                                                       @PathVariable Long supplyId,
                                                                        @Valid @RequestBody InventoryMovementRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(movementService.register(supplyId, request));
+                .body(movementService.register(restaurantId, supplyId, request));
     }
 }

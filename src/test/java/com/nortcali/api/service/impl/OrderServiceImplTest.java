@@ -318,7 +318,7 @@ class OrderServiceImplTest {
         // Debe llamarse register para el suministro con qty = 0.5 * 2 = 1.0
         ArgumentCaptor<InventoryMovementRequest> movCaptor =
                 ArgumentCaptor.forClass(InventoryMovementRequest.class);
-        verify(inventoryService).register(eq(20L), movCaptor.capture());
+        verify(inventoryService).register(eq(1L), eq(20L), movCaptor.capture());
 
         InventoryMovementRequest movReq = movCaptor.getValue();
         assertThat(movReq.getMovementType()).isEqualTo("salida");
@@ -348,7 +348,7 @@ class OrderServiceImplTest {
         when(recipeRepo.findByMenuItemIdAndVariantIdIsNullAndIsActiveTrue(10L)).thenReturn(Optional.of(recipe));
         // Simula que el descuento falla (ej. stock insuficiente)
         doThrow(new BusinessRuleException("Stock insuficiente"))
-                .when(inventoryService).register(anyLong(), any());
+                .when(inventoryService).register(anyLong(), anyLong(), any());
 
         // La orden igual cambia de estado; el error de inventario solo se loguea
         service.updateStatus(restaurantId, orderId, statusRequest("confirmed"));

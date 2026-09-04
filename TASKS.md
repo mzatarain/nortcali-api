@@ -290,6 +290,43 @@ _(Todos los ítems de esta sección están resueltos)_
     escrito pero bloqueado por un problema de entorno preexistente en H2 (ver nota siguiente)
   - **No desplegado** — cambios en el working tree, pendientes de revisión/commit/deploy
 
+- [x] **Fase 0b — cierre del gap de sub-recursos sin `restaurantId` en la URL** (2026-09-04)
+  Cierra el gap documentado en la entrada anterior: 5 endpoints resolvían el restaurante desde
+  un sub-recurso (`employees/{id}`, `cash-sessions/{id}/close`, `menu-items/{itemId}/variants`
+  y `.../recipe`, `menu-item-variants/{variantId}/modifiers`, `supplies/{supplyId}/movements`)
+  sin que `RestaurantAccessInterceptor` los cubriera. Enfoque elegido: mover `restaurantId` al
+  path de cada endpoint (en vez de agregar verificación manual por service) para que el
+  interceptor de Fase 0 los cubra automáticamente, más una verificación de pertenencia del
+  sub-recurso al restaurante en la capa de service (`ResourceNotFoundException` si no coincide,
+  no `ForbiddenException` — evita filtrar la existencia del recurso a un restaurante ajeno).
+  - Rutas movidas bajo `/restaurants/{restaurantId}/...`:
+    `PUT .../employees/{id}`, `PUT .../employees/{id}/status`,
+    `POST .../cash-sessions/{id}/close`,
+    `GET/POST/PUT/DELETE .../menu-items/{itemId}/variants[/{variantId}]`,
+    `GET/POST .../menu-items/{itemId}/recipe[s]`,
+    `GET/POST/DELETE .../menu-item-variants/{variantId}/modifiers[/{modifierId}]`,
+    `GET/POST .../supplies/{supplyId}/movements`
+  - `RestaurantController`: `{id}` renombrado a `{restaurantId}` en `GET/PUT/DELETE /{restaurantId}`
+    — antes el interceptor no lo detectaba por el nombre de variable; ahora sí (comportamiento
+    nuevo: un empleado ya no puede leer/editar/desactivar un restaurante ajeno solo por rol)
+  - Verificación de pertenencia agregada en los services: `CashSessionServiceImpl.close`,
+    `EmployeeServiceImpl.update/updateStatus`, `InventoryMovementServiceImpl.getBySupply/register`,
+    `MenuItemVariantServiceImpl` (todos los métodos, vía `requireMenuItemInRestaurant`/`findOrThrow`),
+    `RecipeServiceImpl` (vía `requireMenuItemInRestaurant`), `VariantModifierServiceImpl` (vía
+    `requireVariantInRestaurant`)
+  - `OrderServiceImpl.deductInventory` actualizado para pasar `restaurantId` a
+    `InventoryMovementService.register` (ahora requerido por firma)
+  - Frontend (`nortcali-management`) actualizado en el mismo cambio: `cashSessionsApi`,
+    `employeesApi`, `inventoryApi`, `menuApi`, `modifiersApi` + hooks (`useCashSessions`,
+    `useEmployees`, `useInventory`, `useMenu`, `useModifiers`) + componentes que las llaman
+    (`MovementsDrawer`, `RecipeDrawer`, `VariantsDrawer`, `CreateOrderDrawer`) — todas requieren
+    `restaurantId` ahora; `tsc --noEmit` limpio
+  - `mvn compile` — BUILD SUCCESS. `mvn test -Dtest='!*IntegrationTest'` — 77/80 verde, los 3
+    fallos son los `UnnecessaryStubbingException` preexistentes de `SaleServiceImplTest` (no
+    relacionados, documentados abajo)
+  - Aislamiento empleado↔restaurante de la Fase 0 queda **completo** — ya no quedan endpoints de
+    negocio sin cobertura. Sigue pendiente el deploy a producción (decisión del usuario)
+
 - [ ] **Deuda descubierta — H2 2.4.x rompe todos los tests de integración** (2026-09-03)
   `SET SESSION time_zone='+00:00'` (emitido por Hibernate vía `hibernate.jdbc.time_zone=UTC`)
   ya no es válido en H2 `2.4.240`. Afecta a **todo** `@SpringBootTest` de integración, incluido

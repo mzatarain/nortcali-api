@@ -14,7 +14,7 @@ public interface EmployeeService {
 
     EmployeeResponse create(Long restaurantId, EmployeeRequest request);
 
-    EmployeeResponse update(Long id, EmployeeRequest request);
+    EmployeeResponse update(Long restaurantId, Long id, EmployeeRequest request);
 
-    EmployeeResponse updateStatus(Long id, EmployeeStatusRequest request);
+    EmployeeResponse updateStatus(Long restaurantId, Long id, EmployeeStatusRequest request);
 }

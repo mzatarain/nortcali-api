@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface InventoryMovementService {
 
-    List<InventoryMovementResponse> getBySupply(Long supplyId);
+    List<InventoryMovementResponse> getBySupply(Long restaurantId, Long supplyId);
 
-    InventoryMovementResponse register(Long supplyId, InventoryMovementRequest request);
+    InventoryMovementResponse register(Long restaurantId, Long supplyId, InventoryMovementRequest request);
 }

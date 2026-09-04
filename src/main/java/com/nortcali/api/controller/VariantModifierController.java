@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/menu-item-variants/{variantId}/modifiers")
+@RequestMapping("/api/v1/restaurants/{restaurantId}/menu-item-variants/{variantId}/modifiers")
 public class VariantModifierController {
 
     private final VariantModifierService variantModifierService;
@@ -21,21 +21,24 @@ public class VariantModifierController {
     }
 
     @GetMapping
-    public ResponseEntity<List<VariantModifierResponse>> getAll(@PathVariable Long variantId) {
-        return ResponseEntity.ok(variantModifierService.getByVariant(variantId));
+    public ResponseEntity<List<VariantModifierResponse>> getAll(@PathVariable Long restaurantId,
+                                                                  @PathVariable Long variantId) {
+        return ResponseEntity.ok(variantModifierService.getByVariant(restaurantId, variantId));
     }
 
     @PostMapping
-    public ResponseEntity<VariantModifierResponse> add(@PathVariable Long variantId,
+    public ResponseEntity<VariantModifierResponse> add(@PathVariable Long restaurantId,
+                                                       @PathVariable Long variantId,
                                                        @Valid @RequestBody VariantModifierRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(variantModifierService.add(variantId, request));
+                .body(variantModifierService.add(restaurantId, variantId, request));
     }
 
     @DeleteMapping("/{modifierId}")
-    public ResponseEntity<Void> remove(@PathVariable Long variantId,
+    public ResponseEntity<Void> remove(@PathVariable Long restaurantId,
+                                       @PathVariable Long variantId,
                                        @PathVariable Long modifierId) {
-        variantModifierService.remove(variantId, modifierId);
+        variantModifierService.remove(restaurantId, variantId, modifierId);
         return ResponseEntity.noContent().build();
     }
 }
