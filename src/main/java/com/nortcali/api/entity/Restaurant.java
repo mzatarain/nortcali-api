@@ -45,6 +45,10 @@ public class Restaurant {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", nullable = false)
     private City city;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
     
     /* 
      * CONSTRUCTORS
@@ -119,6 +123,14 @@ public class Restaurant {
 
     public void setCity(City city) {
     	this.city = city;
+    }
+
+    public Tenant getTenant() {
+        return tenant;
+    }
+
+    public void setTenant(Tenant tenant) {
+        this.tenant = tenant;
     }
 
     public String getTimezone() { return timezone; }

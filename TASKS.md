@@ -290,6 +290,23 @@ _(Todos los ítems de esta sección están resueltos)_
     escrito pero bloqueado por un problema de entorno preexistente en H2 (ver nota siguiente)
   - **No desplegado** — cambios en el working tree, pendientes de revisión/commit/deploy
 
+- [x] **Fase 1 del plan SaaS — primeros dos pasos: fundamento de tenants** (2026-09-04)
+  Ver `../SAAS-TASKS.md` (Fase 1) para el checklist completo y qué queda pendiente (interceptor,
+  JWT, `RestaurantServiceImpl.getAll()`, endpoint de alta de restaurante por `TENANT_ADMIN`).
+  - `V18__tenants.sql`: tabla `tenants` + `restaurants.tenant_id BIGINT NOT NULL` + FK, aplicada
+    y verificada en local (backfill: tenant "NortCali" con el único restaurante existente)
+  - `TenantStatus` + `TenantStatusConverter` (mismo patrón enum+converter lowercase del proyecto)
+  - Entidad `Tenant` + `TenantRepository` (sin mapper/DTOs/endpoints — sin consumidor todavía)
+  - `Restaurant`: relación `@ManyToOne Tenant`
+  - `RestaurantServiceImpl.create()`: fix de regresión — sin esto, el `NOT NULL` de `tenant_id`
+    rompería el alta de restaurantes (nunca se seteaba `tenant`). Asigna el tenant único si solo
+    hay uno; lanza `BusinessRuleException` si hay más de uno (placeholder hasta que el tenant
+    viaje en el JWT)
+  - `mvn compile` — BUILD SUCCESS. `mvn test -Dtest='!*IntegrationTest'` — 77/80 verde (mismos 3
+    fallos preexistentes de `SaleServiceImplTest`, no relacionados). `NortcaliApiApplicationTests`
+    (boot de contexto real contra MySQL local, no H2) pasa — valida `ddl-auto=validate` contra el
+    schema con la entidad `Tenant` nueva
+
 - [x] **Fase 0b — cierre del gap de sub-recursos sin `restaurantId` en la URL** (2026-09-04)
   Cierra el gap documentado en la entrada anterior: 5 endpoints resolvían el restaurante desde
   un sub-recurso (`employees/{id}`, `cash-sessions/{id}/close`, `menu-items/{itemId}/variants`
