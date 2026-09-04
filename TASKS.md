@@ -256,3 +256,44 @@ _(Todos los ítems de esta sección están resueltos)_
   - `.env.example` — plantilla de variables requeridas (`DB_DATABASE`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`).
   - `.env` añadido a `.gitignore`.
   - Usar: `cp .env.example .env` → editar valores → `docker compose up -d`.
+
+- [x] **Timezone por restaurante — puntos pendientes corregidos** (2026-09-03)
+  `SaleServiceImpl.createFromOrder()` ya usaba `LocalDate.now(ZoneId.of(restaurant.getTimezone()))`,
+  pero quedaban dos cálculos de "hoy" en UTC puro que podían mostrar el día equivocado en
+  restaurantes al oeste de UTC:
+  - `CashSessionServiceImpl.close()` — `LocalDate today = LocalDate.now();` usado para sumar
+    `totalSales`/`totalExpenses`/`totalIncomes` del día → ahora
+    `LocalDate.now(ZoneId.of(session.getRestaurant().getTimezone()))`.
+  - `OrderServiceImpl.closeDay()` — `LocalDate.now().atStartOfDay()` usado para el rango
+    `[start, end)` de órdenes activas del día → ahora busca el `Restaurant` por `restaurantId`
+    y usa `LocalDate.now(ZoneId.of(restaurant.getTimezone())).atStartOfDay()`. Afecta tanto al
+    endpoint `close-day` como al cron `EndOfDayScheduler` (23:55 UTC), que llama a este método
+    por restaurante.
+  - `mvn compile` — BUILD SUCCESS.
+
+- [x] **Parche de seguridad: aislamiento por restaurante (Fase 0 del plan SaaS)** (2026-09-03)
+  Ningún controller/service/filter verificaba que el empleado autenticado perteneciera al
+  `restaurantId` de la URL — solo se validaba rol y, en algunos services, que el *recurso*
+  perteneciera a ese `restaurantId` (nunca el empleado). Cualquier empleado autenticado podía
+  operar sobre cualquier restaurante cambiando la URL. Ver detalle completo en
+  `../SAAS-TASKS.md` (Fase 0).
+  - Nuevo `RestaurantAccessInterceptor` (`config/`) — `HandlerInterceptor` registrado en
+    `WebConfig` sobre `/api/v1/**`; compara `{restaurantId}` del path contra
+    `employee.getRestaurant()`
+  - Nueva `ForbiddenException` (documentada como pendiente en este mismo archivo desde antes) +
+    handler 403 en `GlobalExceptionHandler`
+  - Cubre todos los endpoints con `restaurantId` literal en el path (~17 controllers). No cubre
+    endpoints keyed por sub-recurso sin `restaurantId` en la URL (`employees/{id}`,
+    `cash-sessions/{id}/close`, `menu-item-variants/{variantId}/modifiers`,
+    `supplies/{supplyId}/movements`) — gap documentado, pendiente de una pasada adicional
+  - `RestaurantAccessInterceptorTest` (unitario, 5/5 verde). `RestaurantAccessIntegrationTest`
+    escrito pero bloqueado por un problema de entorno preexistente en H2 (ver nota siguiente)
+  - **No desplegado** — cambios en el working tree, pendientes de revisión/commit/deploy
+
+- [ ] **Deuda descubierta — H2 2.4.x rompe todos los tests de integración** (2026-09-03)
+  `SET SESSION time_zone='+00:00'` (emitido por Hibernate vía `hibernate.jdbc.time_zone=UTC`)
+  ya no es válido en H2 `2.4.240`. Afecta a **todo** `@SpringBootTest` de integración, incluido
+  `AuthIntegrationTest` — confirmado reproducible en `HEAD` limpio, sin relación con ningún
+  cambio de esta sesión. Sugerencia: fijar `<h2.version>2.3.232</h2.version>` (ya está en el
+  repositorio Maven local) o ajustar la URL de test. También hay 3 tests preexistentes con
+  `UnnecessaryStubbingException` en `SaleServiceImplTest`, no relacionados entre sí ni con esto.
