@@ -300,7 +300,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public CloseDayResponse closeDay(Long restaurantId) {
-        LocalDateTime start = LocalDate.now().atStartOfDay();
+        Restaurant restaurant = restaurantRepo.findById(restaurantId)
+                .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
+
+        LocalDateTime start = LocalDate.now(ZoneId.of(restaurant.getTimezone())).atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
         List<OrderStatus> activeStatuses = List.of(

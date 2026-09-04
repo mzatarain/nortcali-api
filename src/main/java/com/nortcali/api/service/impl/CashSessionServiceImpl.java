@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Service
 @Transactional
@@ -84,7 +85,7 @@ public class CashSessionServiceImpl implements CashSessionService {
         var closedBy = employeeRepo.findById(request.getClosedBy())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getClosedBy()));
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of(session.getRestaurant().getTimezone()));
         Long restaurantId = session.getRestaurant().getId();
 
         // Calcular totales del día
