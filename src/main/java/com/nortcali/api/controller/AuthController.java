@@ -61,13 +61,13 @@ public class AuthController {
         }
 
         authManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
 
-        var employee = employeeRepo.findByUsername(request.getUsername())
-                .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + request.getUsername()));
+        var employee = employeeRepo.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with email: " + request.getEmail()));
 
-        String token = jwtUtil.generateToken(request.getUsername(), resolveTenantId(employee));
+        String token = jwtUtil.generateToken(request.getEmail(), resolveTenantId(employee));
 
         // Registrar sesión activa en tabla sessions, con fecha de expiración alineada al JWT
         Session session = new Session();
@@ -79,7 +79,7 @@ public class AuthController {
                 .plusSeconds(jwtUtil.getExpiration() / 1000));
         sessionRepo.save(session);
 
-        log.info("Login exitoso para usuario '{}'", request.getUsername());
+        log.info("Login exitoso para '{}'", request.getEmail());
         return ResponseEntity.ok(new LoginResponse(token, employee.getUsername(), employee.getRole()));
     }
 
@@ -101,8 +101,9 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refresh(HttpServletRequest httpRequest) {
-        // El JWT fue validado por JwtAuthFilter — el username ya está en el SecurityContext
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        // El JWT fue validado por JwtAuthFilter — el email ya está en el SecurityContext
+        // (Fase 2: el principal es el email, ver EmployeeDetailsService)
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
 
         String authHeader = httpRequest.getHeader("Authorization");
         String oldToken = authHeader.substring(7); // "Bearer " ya validado por el filtro
@@ -111,11 +112,11 @@ public class AuthController {
         Session oldSession = sessionRepo.findByTokenAndIsActiveTrue(sha256Hex(oldToken))
                 .orElseThrow(() -> new ResourceNotFoundException("Sesión activa no encontrada para el token"));
 
-        var employee = employeeRepo.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
+        var employee = employeeRepo.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with email: " + email));
 
         // Generar nuevo JWT
-        String newToken = jwtUtil.generateToken(username, resolveTenantId(employee));
+        String newToken = jwtUtil.generateToken(email, resolveTenantId(employee));
 
         // Invalidar sesión anterior (rotación de token)
         oldSession.setActive(false);
@@ -131,15 +132,15 @@ public class AuthController {
                 .plusSeconds(jwtUtil.getExpiration() / 1000));
         sessionRepo.save(newSession);
 
-        log.info("Token renovado para usuario '{}'", username);
+        log.info("Token renovado para '{}'", email);
         return ResponseEntity.ok(new LoginResponse(newToken, employee.getUsername(), employee.getRole()));
     }
 
     @GetMapping("/me")
     public ResponseEntity<EmployeeResponse> me() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        var employee = employeeRepo.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        var employee = employeeRepo.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Employee with email: " + email));
         return ResponseEntity.ok(employeeMapper.toResponse(employee));
     }
     /**

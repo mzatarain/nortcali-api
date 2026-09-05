@@ -14,6 +14,13 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     Optional<Employee> findByUsername(String username);
 
+    /**
+     * Fase 2 (plan SaaS): identificador de login — reemplaza a {@code findByUsername} en todo
+     * el flujo de autenticación (login, JWT, SecurityContext). {@code username} se conserva
+     * como campo interno del empleado, sin uso en auth desde este cambio.
+     */
+    Optional<Employee> findByEmail(String email);
+
     List<Employee> findByRestaurantsId(Long restaurantId);
 
     /**
@@ -26,4 +33,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
      */
     @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.restaurants r LEFT JOIN FETCH r.tenant WHERE e.username = :username")
     Optional<Employee> findByUsernameWithRestaurants(@Param("username") String username);
+
+    /** Fase 2: misma necesidad de fetch-join que {@code findByUsernameWithRestaurants}, por email. */
+    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.restaurants r LEFT JOIN FETCH r.tenant WHERE e.email = :email")
+    Optional<Employee> findByEmailWithRestaurants(@Param("email") String email);
 }

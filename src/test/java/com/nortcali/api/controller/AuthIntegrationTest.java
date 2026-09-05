@@ -52,13 +52,17 @@ class AuthIntegrationTest {
     @MockitoBean EmployeeRepository employeeRepo;
     @MockitoBean SessionRepository sessionRepo;
 
+    // USERNAME: campo interno del empleado, ya no usado para login (Fase 2) — se conserva
+    // para poblar Employee.username. EMAIL es el identificador de login.
     private static final String USERNAME = "admin";
+    private static final String EMAIL = "admin@nortcali.com";
     private static final String PASSWORD = "Secure#2026";
 
     @BeforeEach
     void setUp() {
         Employee employee = new Employee();
         employee.setUsername(USERNAME);
+        employee.setEmail(EMAIL);
         employee.setPassword(passwordEncoder.encode(PASSWORD));
         employee.setFirstName("Carlos");
         employee.setLastName("Reyes");
@@ -67,7 +71,7 @@ class AuthIntegrationTest {
         employee.setLocked(false);
         employee.setHireDate(LocalDate.of(2024, 1, 15));
 
-        when(employeeRepo.findByUsername(USERNAME)).thenReturn(Optional.of(employee));
+        when(employeeRepo.findByEmail(EMAIL)).thenReturn(Optional.of(employee));
         when(sessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // El filtro ahora valida la sesión en DB para cada request autenticado
@@ -84,7 +88,7 @@ class AuthIntegrationTest {
     void login_credencialesCorrectas_devuelve200ConToken() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody(USERNAME, PASSWORD))))
+                        .content(toJson(loginBody(EMAIL, PASSWORD))))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.token").isNotEmpty())
@@ -99,7 +103,7 @@ class AuthIntegrationTest {
         // Paso 1: obtener el JWT
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody(USERNAME, PASSWORD))))
+                        .content(toJson(loginBody(EMAIL, PASSWORD))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -143,15 +147,15 @@ class AuthIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ── Login con username inexistente → 401 ──────────────────────────────────
+    // ── Login con email inexistente → 401 ──────────────────────────────────────
 
     @Test
     void login_usuarioNoExiste_devuelve401() throws Exception {
-        when(employeeRepo.findByUsername("noexiste")).thenReturn(Optional.empty());
+        when(employeeRepo.findByEmail("noexiste@nortcali.com")).thenReturn(Optional.empty());
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody("noexiste", PASSWORD))))
+                        .content(toJson(loginBody("noexiste@nortcali.com", PASSWORD))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -172,7 +176,7 @@ class AuthIntegrationTest {
         // Primero hacer login para obtener un token válido
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody(USERNAME, PASSWORD))))
+                        .content(toJson(loginBody(EMAIL, PASSWORD))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -194,7 +198,7 @@ class AuthIntegrationTest {
         // Obtener token inicial
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody(USERNAME, PASSWORD))))
+                        .content(toJson(loginBody(EMAIL, PASSWORD))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -220,7 +224,7 @@ class AuthIntegrationTest {
         // Login → refresh → usar el nuevo token en /me
         MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody(USERNAME, PASSWORD))))
+                        .content(toJson(loginBody(EMAIL, PASSWORD))))
                 .andExpect(status().isOk())
                 .andReturn();
 
@@ -250,9 +254,9 @@ class AuthIntegrationTest {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    private LoginRequest loginBody(String username, String password) {
+    private LoginRequest loginBody(String email, String password) {
         LoginRequest req = new LoginRequest();
-        req.setUsername(username);
+        req.setEmail(email);
         req.setPassword(password);
         return req;
     }

@@ -142,7 +142,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(menuItemRepo.findById(menuItemId)).thenReturn(Optional.of(menuItem(menuItemId, "Burrito")));
         when(orderRepo.findMaxSequenceByFolioPrefix(eq(restaurantId), anyString())).thenReturn(null);
 
@@ -186,7 +186,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(restaurantRepo.findByIdWithLock(restaurantId)).thenReturn(Optional.of(restaurant(restaurantId)));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L, "Tacos")));
         when(menuItemRepo.findById(11L)).thenReturn(Optional.of(menuItem(11L, "Refresco")));
         when(orderRepo.findMaxSequenceByFolioPrefix(eq(restaurantId), anyString())).thenReturn(3);
@@ -237,7 +237,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(orderRepo.save(any())).thenReturn(order);
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
         when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
@@ -262,7 +262,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
 
         // DELIVERED → CONFIRMED no está permitido
         assertThatThrownBy(() -> service.updateStatus(restaurantId, orderId, statusRequest("confirmed")))
@@ -280,7 +280,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
 
         assertThatThrownBy(() -> service.updateStatus(restaurantId, orderId, statusRequest("pending")))
                 .isInstanceOf(BusinessRuleException.class);
@@ -307,7 +307,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(orderRepo.save(any())).thenReturn(order);
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
         when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
@@ -341,7 +341,7 @@ class OrderServiceImplTest {
 
         mockSecurityContext("mesero01");
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
-        when(employeeRepo.findByUsername("mesero01")).thenReturn(Optional.of(employee(5L)));
+        when(employeeRepo.findByEmail("mesero01")).thenReturn(Optional.of(employee(5L)));
         when(orderRepo.save(any())).thenReturn(order);
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
         when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));

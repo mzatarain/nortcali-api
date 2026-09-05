@@ -99,7 +99,7 @@ class RestaurantAccessInterceptorTest {
     @Test
     void empleadoNoEncontrado_lanzaForbiddenException() {
         authenticateAs("fantasma");
-        when(employeeRepo.findByUsernameWithRestaurants("fantasma")).thenReturn(Optional.empty());
+        when(employeeRepo.findByEmailWithRestaurants("fantasma")).thenReturn(Optional.empty());
 
         MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
         HttpServletResponse response = new MockHttpServletResponse();
@@ -136,17 +136,18 @@ class RestaurantAccessInterceptorTest {
                 .isInstanceOf(ForbiddenException.class);
     }
 
-    private void authenticateAs(String username) {
+    private void authenticateAs(String email) {
         // 3 argumentos (con authorities, aunque vacías) marca el token como autenticado —
-        // igual que JwtAuthFilter.doFilterInternal al construir el authToken real.
+        // igual que JwtAuthFilter.doFilterInternal al construir el authToken real. El
+        // principal es el email (Fase 2, login por email) — ver EmployeeDetailsService.
         SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(username, null, java.util.List.of()));
+                new UsernamePasswordAuthenticationToken(email, null, java.util.List.of()));
     }
 
-    private void withEmployeeRestaurants(String username, Set<Restaurant> restaurants) {
+    private void withEmployeeRestaurants(String email, Set<Restaurant> restaurants) {
         Employee employee = new Employee();
         employee.setRestaurant(restaurants);
-        when(employeeRepo.findByUsernameWithRestaurants(username)).thenReturn(Optional.of(employee));
+        when(employeeRepo.findByEmailWithRestaurants(email)).thenReturn(Optional.of(employee));
     }
 
     private Restaurant restaurantWithId(Long id, Long tenantId) {

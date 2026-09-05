@@ -56,10 +56,12 @@ public class RestaurantAccessInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // findByUsernameWithRestaurants (no findByUsername): preHandle corre antes de que
-        // Spring abra el EntityManager de open-in-view — el orden entre interceptors no está
-        // garantizado — así que `employee.getRestaurant()` debe venir ya inicializado.
-        Employee employee = employeeRepo.findByUsernameWithRestaurants(auth.getName()).orElse(null);
+        // findByEmailWithRestaurants (no findByUsername): preHandle corre antes de que Spring
+        // abra el EntityManager de open-in-view — el orden entre interceptors no está
+        // garantizado — así que `employee.getRestaurant()` debe venir ya inicializado. Por
+        // email (Fase 2): auth.getName() es el principal de EmployeeDetailsService, que desde
+        // el login por email ya no es Employee.username.
+        Employee employee = employeeRepo.findByEmailWithRestaurants(auth.getName()).orElse(null);
         if (employee == null) {
             throw new ForbiddenException("No tienes acceso a este restaurante");
         }

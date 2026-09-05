@@ -94,9 +94,10 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     private Employee resolveAuthenticatedEmployee() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return employeeRepo.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("Empleado autenticado no encontrado: " + username));
+        // Fase 2: el principal es el email (login por email), no Employee.username.
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return employeeRepo.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Empleado autenticado no encontrado: " + email));
     }
 
     @Override

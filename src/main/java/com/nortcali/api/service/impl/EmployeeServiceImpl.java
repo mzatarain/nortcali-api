@@ -66,6 +66,12 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (employeeRepo.findByUsername(request.getUsername()).isPresent()) {
             throw new DuplicateResourceException("Ya existe un empleado con el username '" + request.getUsername() + "'");
         }
+        // Fase 2 (plan SaaS): email es el identificador de login — employees.email tiene
+        // constraint UNIQUE en BD (V20), este check da un 409 legible en vez del error crudo
+        // de la BD.
+        if (employeeRepo.findByEmail(request.getEmail()).isPresent()) {
+            throw new DuplicateResourceException("Ya existe un empleado con el email '" + request.getEmail() + "'");
+        }
 
         Employee employee = new Employee();
         employee.setFirstName(request.getFirstName());
@@ -98,6 +104,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (!employee.getRestaurantId().equals(restaurantId)) {
             throw new ResourceNotFoundException("Employee", id);
         }
+        employeeRepo.findByEmail(request.getEmail())
+                .filter(other -> !other.getId().equals(id))
+                .ifPresent(other -> {
+                    throw new DuplicateResourceException("Ya existe un empleado con el email '" + request.getEmail() + "'");
+                });
         employee.setFirstName(request.getFirstName());
         employee.setLastName(request.getLastName());
         employee.setPhone(request.getPhone());

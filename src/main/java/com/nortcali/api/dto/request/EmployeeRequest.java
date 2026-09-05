@@ -30,6 +30,7 @@ public class EmployeeRequest {
     @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
     private String phone;
 
+    @NotBlank(message = "El email es obligatorio")
     @Email(message = "El email no tiene un formato válido")
     @Size(max = 150, message = "El email no puede superar los 150 caracteres")
     private String email;

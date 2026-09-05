@@ -55,7 +55,9 @@ class RestaurantAccessIntegrationTest {
     @MockitoBean EmployeeRepository employeeRepo;
     @MockitoBean SessionRepository sessionRepo;
 
+    // USERNAME: campo interno, ya no usado para login (Fase 2). EMAIL es el identificador.
     private static final String USERNAME = "cajero1";
+    private static final String EMAIL = "cajero1@nortcali.com";
     private static final String PASSWORD = "Secure#2026";
 
     private static final Long OWN_RESTAURANT_ID = 1L;
@@ -68,6 +70,7 @@ class RestaurantAccessIntegrationTest {
 
         Employee employee = new Employee();
         employee.setUsername(USERNAME);
+        employee.setEmail(EMAIL);
         employee.setPassword(passwordEncoder.encode(PASSWORD));
         employee.setFirstName("Ana");
         employee.setLastName("Gómez");
@@ -77,7 +80,8 @@ class RestaurantAccessIntegrationTest {
         employee.setHireDate(LocalDate.of(2024, 1, 15));
         employee.setRestaurant(Set.of(ownRestaurant));
 
-        when(employeeRepo.findByUsername(USERNAME)).thenReturn(Optional.of(employee));
+        when(employeeRepo.findByEmail(EMAIL)).thenReturn(Optional.of(employee));
+        when(employeeRepo.findByEmailWithRestaurants(EMAIL)).thenReturn(Optional.of(employee));
         when(employeeRepo.findByRestaurantsId(anyLong())).thenReturn(java.util.List.of());
         when(sessionRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -119,7 +123,7 @@ class RestaurantAccessIntegrationTest {
 
     private String login() throws Exception {
         LoginRequest body = new LoginRequest();
-        body.setUsername(USERNAME);
+        body.setEmail(EMAIL);
         body.setPassword(PASSWORD);
 
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
