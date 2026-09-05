@@ -15,6 +15,10 @@ public interface RestaurantRepository extends JpaRepository<Restaurant, Long>{
 
 	List<Restaurant> findByIsActiveTrue();
 
+	List<Restaurant> findByTenantId(Long tenantId);
+
+	List<Restaurant> findByTenantIdAndCityId(Long tenantId, Long cityId);
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("SELECT r FROM Restaurant r WHERE r.id = :id")
 	Optional<Restaurant> findByIdWithLock(@Param("id") Long id);

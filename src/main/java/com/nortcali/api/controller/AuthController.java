@@ -4,6 +4,7 @@ import com.nortcali.api.config.LoginRateLimiter;
 import com.nortcali.api.dto.request.LoginRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.dto.response.LoginResponse;
+import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.Session;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
@@ -66,7 +67,7 @@ public class AuthController {
         var employee = employeeRepo.findByUsername(request.getUsername())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + request.getUsername()));
 
-        String token = jwtUtil.generateToken(request.getUsername());
+        String token = jwtUtil.generateToken(request.getUsername(), resolveTenantId(employee));
 
         // Registrar sesión activa en tabla sessions, con fecha de expiración alineada al JWT
         Session session = new Session();
@@ -114,7 +115,7 @@ public class AuthController {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
 
         // Generar nuevo JWT
-        String newToken = jwtUtil.generateToken(username);
+        String newToken = jwtUtil.generateToken(username, resolveTenantId(employee));
 
         // Invalidar sesión anterior (rotación de token)
         oldSession.setActive(false);
@@ -141,6 +142,21 @@ public class AuthController {
                 .orElseThrow(() -> new ResourceNotFoundException("Employee with username: " + username));
         return ResponseEntity.ok(employeeMapper.toResponse(employee));
     }
+    /**
+     * Deriva el tenant del empleado a partir de sus restaurantes asignados (todavía no existe
+     * un `employee.tenant_id` explícito — Fase 1 del plan SaaS). Con un solo tenant por
+     * restaurante y, hoy, un solo tenant en todo el sistema, cualquier restaurante asignado
+     * sirve. Si el empleado no tiene ningún restaurante asignado, devuelve null — el JWT queda
+     * sin tenantId y RestaurantAccessInterceptor rechazará cualquier acceso con restaurantId en
+     * el path (igual que ya rechaza hoy la pertenencia a restaurante).
+     */
+    private static Long resolveTenantId(Employee employee) {
+        return employee.getRestaurant().stream()
+                .findFirst()
+                .map(r -> r.getTenant().getId())
+                .orElse(null);
+    }
+
     private static String sha256Hex(String input) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")

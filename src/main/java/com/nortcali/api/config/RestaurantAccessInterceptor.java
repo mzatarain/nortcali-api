@@ -1,6 +1,7 @@
 package com.nortcali.api.config;
 
 import com.nortcali.api.entity.Employee;
+import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.exception.ForbiddenException;
 import com.nortcali.api.repository.EmployeeRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +24,14 @@ import java.util.Map;
  * Solo actúa quando el path resuelve un @PathVariable literal "restaurantId" — el resto de
  * las requests (auth, catálogos globales, endpoints sin restaurantId en el path) pasan de
  * largo sin verificación aquí.
+ *
+ * Fase 1 (plan SaaS): además de la pertenencia empleado↔restaurante, verifica que el tenant
+ * del restaurante coincida con el {@code tenantId} que JwtAuthFilter dejó en la request
+ * (leído del JWT — evita una consulta extra). Es defensa en profundidad: si algún día
+ * `employee_restaurants` quedara con una fila inconsistente con el tenant del empleado, o el
+ * JWT quedara desactualizado tras un cambio de tenant, este check lo bloquea igual. Tokens
+ * emitidos antes de este cambio no traen tenantId — quedan rechazados hasta que el empleado
+ * vuelva a iniciar sesión.
  */
 @Component
 public class RestaurantAccessInterceptor implements HandlerInterceptor {
@@ -47,15 +56,26 @@ public class RestaurantAccessInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        Employee employee = employeeRepo.findByUsername(auth.getName()).orElse(null);
+        // findByUsernameWithRestaurants (no findByUsername): preHandle corre antes de que
+        // Spring abra el EntityManager de open-in-view — el orden entre interceptors no está
+        // garantizado — así que `employee.getRestaurant()` debe venir ya inicializado.
+        Employee employee = employeeRepo.findByUsernameWithRestaurants(auth.getName()).orElse(null);
         if (employee == null) {
             throw new ForbiddenException("No tienes acceso a este restaurante");
         }
 
-        boolean hasAccess = employee.getRestaurant().stream()
-                .anyMatch(r -> r.getId().equals(restaurantId));
+        Restaurant restaurant = employee.getRestaurant().stream()
+                .filter(r -> r.getId().equals(restaurantId))
+                .findFirst()
+                .orElse(null);
 
-        if (!hasAccess) {
+        if (restaurant == null) {
+            throw new ForbiddenException("No tienes acceso a este restaurante");
+        }
+
+        Object tenantIdAttr = request.getAttribute("tenantId");
+        Long restaurantTenantId = restaurant.getTenant() == null ? null : restaurant.getTenant().getId();
+        if (tenantIdAttr == null || !tenantIdAttr.equals(restaurantTenantId)) {
             throw new ForbiddenException("No tienes acceso a este restaurante");
         }
 

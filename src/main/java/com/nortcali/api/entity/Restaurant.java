@@ -46,6 +46,17 @@ public class Restaurant {
     @JoinColumn(name = "city_id", nullable = false)
     private City city;
 
+    // Desnormalizado desde city.state/city.state.country — la columna es NOT NULL en la BD
+    // pero no se expone en RestaurantRequest/Response; RestaurantServiceImpl la deriva de la
+    // ciudad seleccionada en create()/update().
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "state_id", nullable = false)
+    private State state;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "country_id", nullable = false)
+    private Country country;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private Tenant tenant;
@@ -123,6 +134,22 @@ public class Restaurant {
 
     public void setCity(City city) {
     	this.city = city;
+    }
+
+    public State getState() {
+        return state;
+    }
+
+    public void setState(State state) {
+        this.state = state;
+    }
+
+    public Country getCountry() {
+        return country;
+    }
+
+    public void setCountry(Country country) {
+        this.country = country;
     }
 
     public Tenant getTenant() {

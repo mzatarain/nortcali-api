@@ -2,6 +2,7 @@ package com.nortcali.api.config;
 
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.Restaurant;
+import com.nortcali.api.entity.Tenant;
 import com.nortcali.api.exception.ForbiddenException;
 import com.nortcali.api.repository.EmployeeRepository;
 import jakarta.servlet.http.HttpServletResponse;
@@ -37,6 +38,8 @@ class RestaurantAccessInterceptorTest {
 
     private static final Long OWN_RESTAURANT_ID = 1L;
     private static final Long OTHER_RESTAURANT_ID = 2L;
+    private static final Long OWN_TENANT_ID = 10L;
+    private static final Long OTHER_TENANT_ID = 20L;
 
     @AfterEach
     void tearDown() {
@@ -56,9 +59,9 @@ class RestaurantAccessInterceptorTest {
     @Test
     void restauranteAjeno_lanzaForbiddenException() {
         authenticateAs("cajero1");
-        withEmployeeRestaurants("cajero1", Set.of(restaurantWithId(OWN_RESTAURANT_ID)));
+        withEmployeeRestaurants("cajero1", Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID)));
 
-        MockHttpServletRequest request = requestWithRestaurantId(OTHER_RESTAURANT_ID);
+        MockHttpServletRequest request = requestWithRestaurantId(OTHER_RESTAURANT_ID, OWN_TENANT_ID);
         HttpServletResponse response = new MockHttpServletResponse();
 
         assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
@@ -68,9 +71,9 @@ class RestaurantAccessInterceptorTest {
     @Test
     void restaurantePropio_dejaPasar() {
         authenticateAs("cajero1");
-        withEmployeeRestaurants("cajero1", Set.of(restaurantWithId(OWN_RESTAURANT_ID)));
+        withEmployeeRestaurants("cajero1", Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID)));
 
-        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID);
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
         HttpServletResponse response = new MockHttpServletResponse();
 
         boolean result = interceptor.preHandle(request, response, new Object());
@@ -81,9 +84,11 @@ class RestaurantAccessInterceptorTest {
     @Test
     void empleadoConVariosRestaurantes_permiteCualquieraDeLosSuyos() {
         authenticateAs("gerente1");
-        withEmployeeRestaurants("gerente1", Set.of(restaurantWithId(OWN_RESTAURANT_ID), restaurantWithId(OTHER_RESTAURANT_ID)));
+        withEmployeeRestaurants("gerente1", Set.of(
+                restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID),
+                restaurantWithId(OTHER_RESTAURANT_ID, OWN_TENANT_ID)));
 
-        MockHttpServletRequest request = requestWithRestaurantId(OTHER_RESTAURANT_ID);
+        MockHttpServletRequest request = requestWithRestaurantId(OTHER_RESTAURANT_ID, OWN_TENANT_ID);
         HttpServletResponse response = new MockHttpServletResponse();
 
         boolean result = interceptor.preHandle(request, response, new Object());
@@ -94,9 +99,37 @@ class RestaurantAccessInterceptorTest {
     @Test
     void empleadoNoEncontrado_lanzaForbiddenException() {
         authenticateAs("fantasma");
-        when(employeeRepo.findByUsername("fantasma")).thenReturn(Optional.empty());
+        when(employeeRepo.findByUsernameWithRestaurants("fantasma")).thenReturn(Optional.empty());
 
-        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID);
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void tenantIdDelTokenNoCoincideConElDelRestaurante_lanzaForbiddenException() {
+        // Pertenencia al restaurante ok, pero el tenantId que trae el JWT es de otro tenant —
+        // caso defensivo (Fase 1): no debería pasar aunque employee_restaurants diga que sí.
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1", Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OTHER_TENANT_ID);
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void tokenSinTenantId_lanzaForbiddenException() {
+        // Token emitido antes de la Fase 1 (o sin el claim por cualquier motivo) — sin
+        // tenantId no hay forma de validar, se rechaza en vez de asumir acceso.
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1", Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, null);
         HttpServletResponse response = new MockHttpServletResponse();
 
         assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
@@ -113,19 +146,23 @@ class RestaurantAccessInterceptorTest {
     private void withEmployeeRestaurants(String username, Set<Restaurant> restaurants) {
         Employee employee = new Employee();
         employee.setRestaurant(restaurants);
-        when(employeeRepo.findByUsername(username)).thenReturn(Optional.of(employee));
+        when(employeeRepo.findByUsernameWithRestaurants(username)).thenReturn(Optional.of(employee));
     }
 
-    private Restaurant restaurantWithId(Long id) {
+    private Restaurant restaurantWithId(Long id, Long tenantId) {
         Restaurant restaurant = new Restaurant();
         restaurant.setId(id);
+        Tenant tenant = new Tenant();
+        tenant.setId(tenantId);
+        restaurant.setTenant(tenant);
         return restaurant;
     }
 
-    private MockHttpServletRequest requestWithRestaurantId(Long restaurantId) {
+    private MockHttpServletRequest requestWithRestaurantId(Long restaurantId, Long tenantId) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE,
                 Map.of("restaurantId", String.valueOf(restaurantId)));
+        request.setAttribute("tenantId", tenantId);
         return request;
     }
 }

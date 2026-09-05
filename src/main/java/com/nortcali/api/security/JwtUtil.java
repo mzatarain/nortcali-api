@@ -25,9 +25,10 @@ public class JwtUtil {
         this.expiration = expiration;
     }
 
-    public String generateToken(String username) {
+    public String generateToken(String username, Long tenantId) {
         return Jwts.builder()
                 .subject(username)
+                .claim("tenantId", tenantId)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(key)
@@ -41,6 +42,22 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    /**
+     * Devuelve el claim {@code tenantId} del token, o {@code null} si el token no lo trae
+     * (p.ej. tokens emitidos antes de la Fase 1 del plan SaaS, todavía vigentes hasta que
+     * expiren). {@code Claims.get(key, Class)} evita depender de si el deserializador JSON
+     * de jjwt guardó el número como Integer o Long.
+     */
+    public Long getTenantId(String token) {
+        Object raw = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("tenantId");
+        return raw == null ? null : Long.valueOf(raw.toString());
     }
 
     /** Devuelve la duración de expiración en milisegundos (para calcular expiresAt al crear sesión). */

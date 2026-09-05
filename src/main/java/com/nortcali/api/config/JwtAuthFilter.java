@@ -93,6 +93,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 );
 
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                // Fase 1 (plan SaaS): tenantId viaja en el JWT para que RestaurantAccessInterceptor
+                // lo verifique sin una consulta extra a Employee. Tokens emitidos antes de este
+                // cambio no traen el claim — jwtUtil.getTenantId devuelve null en ese caso.
+                request.setAttribute("tenantId", jwtUtil.getTenantId(token));
             }
             // Si la sesión es inválida/expirada, no se setea autenticación.
             // Spring Security devuelve 401 para endpoints protegidos y permite
