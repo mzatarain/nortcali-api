@@ -50,6 +50,9 @@ public class SecurityConfig {
                 // ── Endpoints públicos ────────────────────────────────────────
                 .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
 .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                // Fase 3 (plan SaaS): Stripe no manda JWT — la request se valida por firma
+                // (Stripe-Signature) dentro de BillingServiceImpl.handleWebhookEvent, no por sesión
+                .requestMatchers(HttpMethod.POST, "/api/v1/billing/webhook").permitAll()
 
                 // ── Solo ADMIN ────────────────────────────────────────────────
                 // Catálogos de configuración del sistema — rara vez modificados

@@ -2,7 +2,10 @@ package com.nortcali.api.config;
 
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.Restaurant;
+import com.nortcali.api.entity.Tenant;
+import com.nortcali.api.entity.enums.TenantStatus;
 import com.nortcali.api.exception.ForbiddenException;
+import com.nortcali.api.exception.PaymentRequiredException;
 import com.nortcali.api.repository.EmployeeRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -76,12 +79,37 @@ public class RestaurantAccessInterceptor implements HandlerInterceptor {
         }
 
         Object tenantIdAttr = request.getAttribute("tenantId");
-        Long restaurantTenantId = restaurant.getTenant() == null ? null : restaurant.getTenant().getId();
+        Tenant tenant = restaurant.getTenant();
+        Long restaurantTenantId = tenant == null ? null : tenant.getId();
         if (tenantIdAttr == null || !tenantIdAttr.equals(restaurantTenantId)) {
             throw new ForbiddenException("No tienes acceso a este restaurante");
         }
 
+        checkTenantStatus(tenant, request.getMethod());
+
         return true;
+    }
+
+    /**
+     * Fase 3 (plan SaaS): decisión de negocio confirmada con el usuario (2026-09-06) —
+     * {@code past_due} degrada a solo lectura (GET sigue funcionando, el resto de métodos
+     * queda bloqueado con 402 hasta regularizar el pago); {@code suspended}/{@code cancelled}
+     * bloquean todo, incluido GET.
+     */
+    private void checkTenantStatus(Tenant tenant, String httpMethod) {
+        if (tenant == null) {
+            return;
+        }
+        TenantStatus status = tenant.getStatus();
+        if (status == TenantStatus.SUSPENDED || status == TenantStatus.CANCELLED) {
+            throw new ForbiddenException(
+                    "La suscripción de este negocio está " + status.name().toLowerCase()
+                            + ". Contacta a soporte para reactivarla.");
+        }
+        if (status == TenantStatus.PAST_DUE && !"GET".equalsIgnoreCase(httpMethod)) {
+            throw new PaymentRequiredException(
+                    "El pago de la suscripción está pendiente. Solo se permite consulta hasta regularizar el pago.");
+        }
     }
 
     @SuppressWarnings("unchecked")

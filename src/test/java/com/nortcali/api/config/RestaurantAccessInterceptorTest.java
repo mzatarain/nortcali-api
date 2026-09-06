@@ -3,7 +3,9 @@ package com.nortcali.api.config;
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.entity.Tenant;
+import com.nortcali.api.entity.enums.TenantStatus;
 import com.nortcali.api.exception.ForbiddenException;
+import com.nortcali.api.exception.PaymentRequiredException;
 import com.nortcali.api.repository.EmployeeRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.AfterEach;
@@ -136,6 +138,77 @@ class RestaurantAccessInterceptorTest {
                 .isInstanceOf(ForbiddenException.class);
     }
 
+    @Test
+    void tenantSuspendido_lanzaForbiddenExceptionInclusoEnGet() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.SUSPENDED)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("GET");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void tenantCancelado_lanzaForbiddenException() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.CANCELLED)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void tenantPastDue_metodoGet_dejaPasar() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.PAST_DUE)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("GET");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void tenantPastDue_metodoPost_lanzaPaymentRequiredException() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.PAST_DUE)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("POST");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(PaymentRequiredException.class);
+    }
+
+    @Test
+    void tenantActivo_metodoPost_dejaPasar() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.ACTIVE)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("POST");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+    }
+
     private void authenticateAs(String email) {
         // 3 argumentos (con authorities, aunque vacías) marca el token como autenticado —
         // igual que JwtAuthFilter.doFilterInternal al construir el authToken real. El
@@ -151,10 +224,15 @@ class RestaurantAccessInterceptorTest {
     }
 
     private Restaurant restaurantWithId(Long id, Long tenantId) {
+        return restaurantWithId(id, tenantId, TenantStatus.ACTIVE);
+    }
+
+    private Restaurant restaurantWithId(Long id, Long tenantId, TenantStatus status) {
         Restaurant restaurant = new Restaurant();
         restaurant.setId(id);
         Tenant tenant = new Tenant();
         tenant.setId(tenantId);
+        tenant.setStatus(status);
         restaurant.setTenant(tenant);
         return restaurant;
     }

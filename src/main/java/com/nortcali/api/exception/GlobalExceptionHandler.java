@@ -44,6 +44,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse(403, "Forbidden", ex.getMessage(), Instant.now()));
     }
 
+    @ExceptionHandler(PaymentRequiredException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentRequired(PaymentRequiredException ex) {
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED)
+                .body(new ErrorResponse(402, "Payment Required", ex.getMessage(), Instant.now()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new HashMap<>();
