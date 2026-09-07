@@ -18,6 +18,7 @@ import com.nortcali.api.repository.RestaurantRepository;
 import com.nortcali.api.repository.SalesSourceRepository;
 import com.nortcali.api.repository.TenantRepository;
 import com.nortcali.api.repository.UnitRepository;
+import com.nortcali.api.service.EmailService;
 import com.nortcali.api.service.RegistrationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -71,6 +72,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final UnitRepository unitRepo;
     private final SalesSourceRepository salesSourceRepo;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     public RegistrationServiceImpl(TenantRepository tenantRepo,
                                    RestaurantRepository restaurantRepo,
@@ -79,7 +81,8 @@ public class RegistrationServiceImpl implements RegistrationService {
                                    MenuCategoryRepository menuCategoryRepo,
                                    UnitRepository unitRepo,
                                    SalesSourceRepository salesSourceRepo,
-                                   PasswordEncoder passwordEncoder) {
+                                   PasswordEncoder passwordEncoder,
+                                   EmailService emailService) {
         this.tenantRepo = tenantRepo;
         this.restaurantRepo = restaurantRepo;
         this.cityRepo = cityRepo;
@@ -88,6 +91,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         this.unitRepo = unitRepo;
         this.salesSourceRepo = salesSourceRepo;
         this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
 
     @Override
@@ -133,6 +137,7 @@ public class RegistrationServiceImpl implements RegistrationService {
 
         log.info("Nuevo tenant '{}' registrado (id={}, restaurante={}, admin={})",
                 tenant.getName(), tenant.getId(), restaurant.getId(), employee.getEmail());
+        emailService.sendWelcomeEmail(employee.getEmail(), employee.getFirstName(), tenant.getName());
         return employee;
     }
 

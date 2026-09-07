@@ -13,6 +13,7 @@ import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.TenantRepository;
 import com.nortcali.api.service.BillingService;
+import com.nortcali.api.service.EmailService;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
@@ -34,6 +35,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 @Service
@@ -43,6 +45,7 @@ public class BillingServiceImpl implements BillingService {
 
     private final TenantRepository tenantRepo;
     private final EmployeeRepository employeeRepo;
+    private final EmailService emailService;
 
     @Value("${stripe.prices.basico}")
     private String priceBasico;
@@ -59,9 +62,10 @@ public class BillingServiceImpl implements BillingService {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public BillingServiceImpl(TenantRepository tenantRepo, EmployeeRepository employeeRepo) {
+    public BillingServiceImpl(TenantRepository tenantRepo, EmployeeRepository employeeRepo, EmailService emailService) {
         this.tenantRepo = tenantRepo;
         this.employeeRepo = employeeRepo;
+        this.emailService = emailService;
     }
 
     @Override
@@ -212,7 +216,29 @@ public class BillingServiceImpl implements BillingService {
             log.warn("Evento de invoice sin objeto Invoice deserializable");
             return;
         }
-        applyStatus(invoice.getCustomer(), status);
+        tenantRepo.findByStripeCustomerId(invoice.getCustomer()).ifPresentOrElse(
+                tenant -> {
+                    tenant.setStatus(status);
+                    tenantRepo.save(tenant);
+                    log.info("Tenant {} → status {} (customer={})", tenant.getId(), status, invoice.getCustomer());
+                    sendInvoiceEmail(tenant, invoice, status);
+                },
+                () -> log.warn("Webhook de Stripe: ningún tenant con stripe_customer_id={}", invoice.getCustomer()));
+    }
+
+    /** `invoice.customer_email` es una copia del email del Customer al momento de facturar —
+     *  evita una llamada extra a Stripe o una dependencia de {@code EmployeeRepository} aquí. */
+    private void sendInvoiceEmail(Tenant tenant, Invoice invoice, TenantStatus status) {
+        String email = invoice.getCustomerEmail();
+        if (email == null) {
+            return;
+        }
+        if (status == TenantStatus.ACTIVE) {
+            BigDecimal amount = invoice.getAmountPaid() == null ? null : BigDecimal.valueOf(invoice.getAmountPaid());
+            emailService.sendPaymentSucceeded(email, tenant.getName(), tenant.getPlan(), amount, invoice.getHostedInvoiceUrl());
+        } else if (status == TenantStatus.PAST_DUE) {
+            emailService.sendPaymentFailed(email, tenant.getName());
+        }
     }
 
     private void applyStatusFromSubscription(Event event, TenantStatus status) {
@@ -235,19 +261,6 @@ public class BillingServiceImpl implements BillingService {
             tenantRepo.save(tenant);
             log.info("Tenant {} → status {} (subscription={})", tenant.getId(), status, subscription.getId());
         });
-    }
-
-    private void applyStatus(String stripeCustomerId, TenantStatus status) {
-        if (stripeCustomerId == null) {
-            return;
-        }
-        tenantRepo.findByStripeCustomerId(stripeCustomerId).ifPresentOrElse(
-                tenant -> {
-                    tenant.setStatus(status);
-                    tenantRepo.save(tenant);
-                    log.info("Tenant {} → status {} (customer={})", tenant.getId(), status, stripeCustomerId);
-                },
-                () -> log.warn("Webhook de Stripe: ningún tenant con stripe_customer_id={}", stripeCustomerId));
     }
 
     private StripeObject deserialize(Event event) {

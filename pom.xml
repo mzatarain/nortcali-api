@@ -150,6 +150,13 @@
     <artifactId>stripe-java</artifactId>
     <version>29.0.0</version>
 </dependency>
+
+<!-- Email transaccional — Fase 5 del plan SaaS. JavaMailSender hablando SMTP contra AWS SES
+     (sin AWS SDK ni credenciales IAM — solo usuario/password SMTP generados en la consola SES). -->
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-mail</artifactId>
+</dependency>
 	</dependencies>
 
 	<build>
