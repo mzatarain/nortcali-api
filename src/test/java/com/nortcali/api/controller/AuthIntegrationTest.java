@@ -143,7 +143,7 @@ class AuthIntegrationTest {
     void login_contraseñaIncorrecta_devuelve401() throws Exception {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(toJson(loginBody(USERNAME, "wrongpassword"))))
+                        .content(toJson(loginBody(EMAIL, "wrongpassword"))))
                 .andExpect(status().isUnauthorized());
     }
 

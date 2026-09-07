@@ -2,19 +2,30 @@ package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.UnitRequest;
 import com.nortcali.api.dto.response.UnitResponse;
+import com.nortcali.api.entity.Employee;
+import com.nortcali.api.entity.Restaurant;
+import com.nortcali.api.entity.Tenant;
 import com.nortcali.api.entity.Unit;
 import com.nortcali.api.exception.DuplicateResourceException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.UnitMapper;
+import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.UnitRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -25,10 +36,35 @@ import static org.mockito.Mockito.*;
 class UnitServiceImplTest {
 
     @Mock UnitRepository repo;
+    @Mock EmployeeRepository employeeRepo;
     @Mock UnitMapper mapper;
 
     @InjectMocks
     UnitServiceImpl service;
+
+    private static final Long TENANT_ID = 1L;
+
+    @BeforeEach
+    void mockAuthenticatedTenant() {
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                "admin@nortcali.com", null, Collections.emptyList());
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(auth);
+        SecurityContextHolder.setContext(ctx);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
+        Restaurant restaurant = new Restaurant();
+        restaurant.setTenant(tenant);
+        Employee employee = new Employee();
+        employee.setRestaurant(Set.of(restaurant));
+        lenient().when(employeeRepo.findByEmail("admin@nortcali.com")).thenReturn(Optional.of(employee));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -37,6 +73,9 @@ class UnitServiceImplTest {
         u.setId(id);
         u.setName(name);
         u.setAbbreviation(abbreviation);
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
+        u.setTenant(tenant);
         return u;
     }
 
@@ -53,7 +92,7 @@ class UnitServiceImplTest {
     void getAll_devuelveTodas() {
         Unit u1 = unit(1L, "Kilogramo", "kg");
         Unit u2 = unit(2L, "Litro", "l");
-        when(repo.findAll()).thenReturn(List.of(u1, u2));
+        when(repo.findByTenantId(TENANT_ID)).thenReturn(List.of(u1, u2));
         when(mapper.toResponse(u1)).thenReturn(mock(UnitResponse.class));
         when(mapper.toResponse(u2)).thenReturn(mock(UnitResponse.class));
 
@@ -91,7 +130,7 @@ class UnitServiceImplTest {
         Unit entity = unit(null, "Gramo", "g");
         Unit saved = unit(3L, "Gramo", "g");
 
-        when(repo.findByNameIgnoreCase("Gramo")).thenReturn(Optional.empty());
+        when(repo.findByNameIgnoreCaseAndTenantId("Gramo", TENANT_ID)).thenReturn(Optional.empty());
         when(mapper.toEntity(req)).thenReturn(entity);
         when(repo.save(entity)).thenReturn(saved);
         when(mapper.toResponse(saved)).thenReturn(mock(UnitResponse.class));
@@ -103,7 +142,7 @@ class UnitServiceImplTest {
 
     @Test
     void create_nombreDuplicado_lanzaDuplicateResourceException() {
-        when(repo.findByNameIgnoreCase("Kilogramo"))
+        when(repo.findByNameIgnoreCaseAndTenantId("Kilogramo", TENANT_ID))
                 .thenReturn(Optional.of(unit(1L, "Kilogramo", "kg")));
 
         assertThatThrownBy(() -> service.create(request("Kilogramo", "kg")))
@@ -115,7 +154,7 @@ class UnitServiceImplTest {
 
     @Test
     void create_nombreDuplicadoCaseInsensitive_lanzaDuplicateResourceException() {
-        when(repo.findByNameIgnoreCase("kilogramo"))
+        when(repo.findByNameIgnoreCaseAndTenantId("kilogramo", TENANT_ID))
                 .thenReturn(Optional.of(unit(1L, "Kilogramo", "kg")));
 
         assertThatThrownBy(() -> service.create(request("kilogramo", "kg")))
@@ -135,7 +174,7 @@ class UnitServiceImplTest {
 
         service.update(1L, req);
 
-        verify(repo, never()).findByNameIgnoreCase(any());
+        verify(repo, never()).findByNameIgnoreCaseAndTenantId(any(), any());
         verify(mapper).updateEntity(req, existing);
     }
 
@@ -145,13 +184,13 @@ class UnitServiceImplTest {
         UnitRequest req = request("Gramo", "g");
 
         when(repo.findById(1L)).thenReturn(Optional.of(existing));
-        when(repo.findByNameIgnoreCase("Gramo")).thenReturn(Optional.empty());
+        when(repo.findByNameIgnoreCaseAndTenantId("Gramo", TENANT_ID)).thenReturn(Optional.empty());
         when(repo.save(existing)).thenReturn(existing);
         when(mapper.toResponse(existing)).thenReturn(mock(UnitResponse.class));
 
         service.update(1L, req);
 
-        verify(repo).findByNameIgnoreCase("Gramo");
+        verify(repo).findByNameIgnoreCaseAndTenantId("Gramo", TENANT_ID);
         verify(mapper).updateEntity(req, existing);
     }
 
@@ -161,7 +200,7 @@ class UnitServiceImplTest {
         UnitRequest req = request("Litro", "l");
 
         when(repo.findById(1L)).thenReturn(Optional.of(existing));
-        when(repo.findByNameIgnoreCase("Litro"))
+        when(repo.findByNameIgnoreCaseAndTenantId("Litro", TENANT_ID))
                 .thenReturn(Optional.of(unit(2L, "Litro", "l")));
 
         assertThatThrownBy(() -> service.update(1L, req))

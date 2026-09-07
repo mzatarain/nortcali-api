@@ -40,17 +40,25 @@ class SaleServiceImplTest {
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
+    private static final Long TENANT_ID = 1L;
+
     private Restaurant restaurant(Long id) {
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
         Restaurant r = new Restaurant();
         r.setId(id);
+        r.setTenant(tenant);
         return r;
     }
 
     private SalesSource source(Long id, BigDecimal commissionPct) {
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
         SalesSource s = new SalesSource();
         s.setId(id);
         s.setName("Rappi");
         s.setCommissionPct(commissionPct);
+        s.setTenant(tenant);
         return s;
     }
 
@@ -98,7 +106,6 @@ class SaleServiceImplTest {
         when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L)));
         when(menuItemRepo.findById(11L)).thenReturn(Optional.of(menuItem(11L)));
-        when(restaurantRepo.getReferenceById(restaurantId)).thenReturn(restaurant(restaurantId));
 
         Sale savedSale = new Sale();
         when(saleRepo.save(any(Sale.class))).thenReturn(savedSale);
@@ -130,7 +137,6 @@ class SaleServiceImplTest {
         when(sourceRepo.findById(sourceId)).thenReturn(Optional.of(source(sourceId, BigDecimal.ZERO)));
         when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L)));
-        when(restaurantRepo.getReferenceById(restaurantId)).thenReturn(restaurant(restaurantId));
 
         Sale savedSale = new Sale();
         when(saleRepo.save(any(Sale.class))).thenReturn(savedSale);
@@ -155,7 +161,6 @@ class SaleServiceImplTest {
         when(sourceRepo.findById(sourceId)).thenReturn(Optional.of(source(sourceId, new BigDecimal("10.005"))));
         when(employeeRepo.findById(employeeId)).thenReturn(Optional.of(employee(employeeId)));
         when(menuItemRepo.findById(10L)).thenReturn(Optional.of(menuItem(10L)));
-        when(restaurantRepo.getReferenceById(restaurantId)).thenReturn(restaurant(restaurantId));
 
         Sale savedSale = new Sale();
         when(saleRepo.save(any(Sale.class))).thenReturn(savedSale);

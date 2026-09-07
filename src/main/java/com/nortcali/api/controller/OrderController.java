@@ -71,13 +71,13 @@ public class OrderController {
     }
 
     @PostMapping("/restaurants/{restaurantId}/orders/close-day")
-    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CASHIER', 'MANAGER', 'ADMIN', 'TENANT_ADMIN')")
     public ResponseEntity<CloseDayResponse> closeDay(@PathVariable Long restaurantId) {
         return ResponseEntity.ok(orderService.closeDay(restaurantId));
     }
 
     @DeleteMapping("/restaurants/{restaurantId}/orders/{orderId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TENANT_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long restaurantId,
                                        @PathVariable Long orderId) {
         orderService.delete(restaurantId, orderId);

@@ -19,6 +19,10 @@ public class SalesSource {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
+
     public SalesSource() {}
 
     public Long getId() { return id; }
@@ -32,4 +36,7 @@ public class SalesSource {
 
     public boolean isActive() { return isActive; }
     public void setActive(boolean active) { this.isActive = active; }
+
+    public Tenant getTenant() { return tenant; }
+    public void setTenant(Tenant tenant) { this.tenant = tenant; }
 }

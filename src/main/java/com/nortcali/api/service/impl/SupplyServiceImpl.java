@@ -57,10 +57,9 @@ public class SupplyServiceImpl implements SupplyService {
 
     @Override
     public SupplyResponse create(Long restaurantId, SupplyRequest request) {
-        restaurantRepo.findById(restaurantId)
+        var restaurant = restaurantRepo.findById(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
-        var unit = unitRepo.findById(request.getUnitId())
-                .orElseThrow(() -> new ResourceNotFoundException("Unit", request.getUnitId()));
+        var unit = findUnitOwnedByTenant(request.getUnitId(), restaurant.getTenant().getId());
 
         Supply entity = mapper.toEntity(request);
         entity.setRestaurant(restaurantRepo.getReferenceById(restaurantId));
@@ -72,11 +71,23 @@ public class SupplyServiceImpl implements SupplyService {
     @Override
     public SupplyResponse update(Long id, SupplyRequest request) {
         Supply entity = findOrThrow(id);
-        var unit = unitRepo.findById(request.getUnitId())
-                .orElseThrow(() -> new ResourceNotFoundException("Unit", request.getUnitId()));
+        var unit = findUnitOwnedByTenant(request.getUnitId(), entity.getRestaurant().getTenant().getId());
         mapper.updateEntity(request, entity);
         entity.setUnit(unit);
         return mapper.toResponse(supplyRepo.save(entity));
+    }
+
+    /**
+     * Fase 4 (plan SaaS): `units` ya no es un catálogo global (V23) — sin esta verificación,
+     * un insumo podría quedar referenciando la unidad de otro tenant adivinando el id.
+     */
+    private com.nortcali.api.entity.Unit findUnitOwnedByTenant(Long unitId, Long tenantId) {
+        var unit = unitRepo.findById(unitId)
+                .orElseThrow(() -> new ResourceNotFoundException("Unit", unitId));
+        if (!unit.getTenant().getId().equals(tenantId)) {
+            throw new ResourceNotFoundException("Unit", unitId);
+        }
+        return unit;
     }
 
     @Override

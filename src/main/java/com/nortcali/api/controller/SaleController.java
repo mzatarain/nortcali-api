@@ -52,14 +52,14 @@ public class SaleController {
         return ResponseEntity.ok(saleService.getById(restaurantId, id));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','TENANT_ADMIN')")
     @PostMapping
     public ResponseEntity<SaleResponse> create(@PathVariable Long restaurantId,
                                                @Valid @RequestBody SaleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(saleService.create(restaurantId, request));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','TENANT_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deactivate(@PathVariable Long restaurantId, @PathVariable Long id) {
         saleService.deactivate(restaurantId, id);

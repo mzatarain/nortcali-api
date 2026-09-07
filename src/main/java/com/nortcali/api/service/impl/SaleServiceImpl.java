@@ -98,7 +98,10 @@ public class SaleServiceImpl implements SaleService {
     public SaleResponse create(Long restaurantId, SaleRequest request) {
         var restaurant = restaurantRepo.findById(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
+        // Fase 4 (plan SaaS): `sales_sources` ya no es un catálogo global (V23) — sin esta
+        // verificación, una venta podría quedar asociada a la fuente de venta de otro tenant.
         var source = sourceRepo.findById(request.getSourceId())
+                .filter(s -> s.getTenant().getId().equals(restaurant.getTenant().getId()))
                 .orElseThrow(() -> new ResourceNotFoundException("SalesSource", request.getSourceId()));
         var employee = employeeRepo.findById(request.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", request.getEmployeeId()));
@@ -186,10 +189,11 @@ public class SaleServiceImpl implements SaleService {
         Order order = orderRepo.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
+        Long tenantId = order.getRestaurant().getTenant().getId();
         String sourceName = toSalesSourceName(order.getSource());
-        var source = sourceRepo.findByNameIgnoreCaseAndIsActiveTrue(sourceName)
-                .or(() -> sourceRepo.findByNameIgnoreCaseAndIsActiveTrue("pos"))
-                .or(() -> sourceRepo.findFirstByIsActiveTrueOrderByIdAsc())
+        var source = sourceRepo.findByNameIgnoreCaseAndIsActiveTrueAndTenantId(sourceName, tenantId)
+                .or(() -> sourceRepo.findByNameIgnoreCaseAndIsActiveTrueAndTenantId("pos", tenantId))
+                .or(() -> sourceRepo.findFirstByTenantIdAndIsActiveTrueOrderByIdAsc(tenantId))
                 .orElseThrow(() -> new BusinessRuleException(
                         "No hay fuentes de venta activas configuradas. Configúralas en Ajustes → Fuentes de venta."));
 

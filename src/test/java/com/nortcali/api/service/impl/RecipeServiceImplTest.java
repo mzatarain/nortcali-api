@@ -39,10 +39,15 @@ class RecipeServiceImplTest {
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private static final Long RESTAURANT_ID = 100L;
+    private static final Long TENANT_ID = 1L;
 
     private MenuItem menuItem(Long id) {
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
+
         Restaurant restaurant = new Restaurant();
         restaurant.setId(RESTAURANT_ID);
+        restaurant.setTenant(tenant);
 
         MenuItem m = new MenuItem();
         m.setId(id);
@@ -63,6 +68,9 @@ class RecipeServiceImplTest {
         Unit u = new Unit();
         u.setId(id);
         u.setName("Kg");
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
+        u.setTenant(tenant);
         return u;
     }
 

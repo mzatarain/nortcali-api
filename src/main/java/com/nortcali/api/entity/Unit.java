@@ -15,6 +15,10 @@ public class Unit {
     @Column(nullable = false, length = 10)
     private String abbreviation;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tenant_id", nullable = false)
+    private Tenant tenant;
+
     public Unit() {}
 
     public Long getId() { return id; }
@@ -25,4 +29,7 @@ public class Unit {
 
     public String getAbbreviation() { return abbreviation; }
     public void setAbbreviation(String abbreviation) { this.abbreviation = abbreviation; }
+
+    public Tenant getTenant() { return tenant; }
+    public void setTenant(Tenant tenant) { this.tenant = tenant; }
 }

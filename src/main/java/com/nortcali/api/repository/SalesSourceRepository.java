@@ -10,9 +10,17 @@ public interface SalesSourceRepository extends JpaRepository<SalesSource, Long> 
 
     List<SalesSource> findByIsActiveTrue();
 
+    List<SalesSource> findByTenantIdAndIsActiveTrue(Long tenantId);
+
     Optional<SalesSource> findByNameIgnoreCase(String name);
+
+    Optional<SalesSource> findByNameIgnoreCaseAndTenantId(String name, Long tenantId);
 
     Optional<SalesSource> findByNameIgnoreCaseAndIsActiveTrue(String name);
 
+    Optional<SalesSource> findByNameIgnoreCaseAndIsActiveTrueAndTenantId(String name, Long tenantId);
+
     Optional<SalesSource> findFirstByIsActiveTrueOrderByIdAsc();
+
+    Optional<SalesSource> findFirstByTenantIdAndIsActiveTrueOrderByIdAsc(Long tenantId);
 }

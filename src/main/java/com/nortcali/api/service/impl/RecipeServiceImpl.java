@@ -106,11 +106,15 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     private List<RecipeIngredient> buildIngredients(RecipeRequest request, Recipe recipe) {
+        Long tenantId = recipe.getMenuItem().getRestaurant().getTenant().getId();
         List<RecipeIngredient> result = new ArrayList<>();
         for (var dto : request.getIngredients()) {
             var supply = supplyRepo.findById(dto.getSupplyId())
                     .orElseThrow(() -> new ResourceNotFoundException("Supply", dto.getSupplyId()));
+            // Fase 4 (plan SaaS): `units` ya no es un catálogo global (V23) — sin esta
+            // verificación, una receta podría referenciar la unidad de otro tenant.
             var unit = unitRepo.findById(dto.getUnitId())
+                    .filter(u -> u.getTenant().getId().equals(tenantId))
                     .orElseThrow(() -> new ResourceNotFoundException("Unit", dto.getUnitId()));
 
             // Regla de negocio: calculatedCost = quantity * supply.unitCost

@@ -5,6 +5,7 @@ import com.nortcali.api.dto.request.LoginRequest;
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.entity.Session;
+import com.nortcali.api.entity.Tenant;
 import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.SessionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -65,8 +66,12 @@ class RestaurantAccessIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        Tenant tenant = new Tenant();
+        tenant.setId(1L);
+
         Restaurant ownRestaurant = new Restaurant();
         ownRestaurant.setId(OWN_RESTAURANT_ID);
+        ownRestaurant.setTenant(tenant);
 
         Employee employee = new Employee();
         employee.setUsername(USERNAME);

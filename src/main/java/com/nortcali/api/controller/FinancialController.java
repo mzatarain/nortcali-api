@@ -44,7 +44,7 @@ public class FinancialController {
         return ResponseEntity.ok(financialService.getPeriods(restaurantId));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','TENANT_ADMIN')")
     @PostMapping("/periods")
     public ResponseEntity<FinancialPeriodResponse> createPeriod(@PathVariable Long restaurantId,
                                                                  @Valid @RequestBody FinancialPeriodRequest request) {
@@ -52,7 +52,7 @@ public class FinancialController {
                 .body(financialService.createPeriod(restaurantId, request));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','TENANT_ADMIN')")
     @PostMapping("/periods/{periodId}/close")
     public ResponseEntity<FinancialPeriodResponse> closePeriod(@PathVariable Long restaurantId,
                                                                 @PathVariable Long periodId) {

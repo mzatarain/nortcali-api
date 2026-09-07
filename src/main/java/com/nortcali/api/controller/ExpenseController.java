@@ -86,7 +86,7 @@ public class ExpenseController {
         return ResponseEntity.ok(expenseService.update(id, request));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'TENANT_ADMIN')")
     @PatchMapping("/expenses/{id}/paid")
     public ResponseEntity<ExpenseResponse> updatePaidStatus(@PathVariable Long restaurantId,
                                                             @PathVariable Long id,

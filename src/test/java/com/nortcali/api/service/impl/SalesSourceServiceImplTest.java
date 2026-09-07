@@ -2,21 +2,32 @@ package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.SalesSourceRequest;
 import com.nortcali.api.dto.response.SalesSourceResponse;
+import com.nortcali.api.entity.Employee;
+import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.entity.SalesSource;
+import com.nortcali.api.entity.Tenant;
 import com.nortcali.api.exception.DuplicateResourceException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.SalesSourceMapper;
+import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.SalesSourceRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,10 +38,35 @@ import static org.mockito.Mockito.*;
 class SalesSourceServiceImplTest {
 
     @Mock SalesSourceRepository repo;
+    @Mock EmployeeRepository employeeRepo;
     @Mock SalesSourceMapper mapper;
 
     @InjectMocks
     SalesSourceServiceImpl service;
+
+    private static final Long TENANT_ID = 1L;
+
+    @BeforeEach
+    void mockAuthenticatedTenant() {
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                "admin@nortcali.com", null, Collections.emptyList());
+        SecurityContext ctx = SecurityContextHolder.createEmptyContext();
+        ctx.setAuthentication(auth);
+        SecurityContextHolder.setContext(ctx);
+
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
+        Restaurant restaurant = new Restaurant();
+        restaurant.setTenant(tenant);
+        Employee employee = new Employee();
+        employee.setRestaurant(Set.of(restaurant));
+        lenient().when(employeeRepo.findByEmail("admin@nortcali.com")).thenReturn(Optional.of(employee));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -40,6 +76,9 @@ class SalesSourceServiceImplTest {
         s.setName(name);
         s.setCommissionPct(pct);
         s.setActive(true);
+        Tenant tenant = new Tenant();
+        tenant.setId(TENANT_ID);
+        s.setTenant(tenant);
         return s;
     }
 
@@ -56,14 +95,14 @@ class SalesSourceServiceImplTest {
     void getAll_devuelveSoloActivas() {
         SalesSource s1 = source(1L, "Rappi", new BigDecimal("15.00"));
         SalesSource s2 = source(2L, "Uber Eats", new BigDecimal("20.00"));
-        when(repo.findByIsActiveTrue()).thenReturn(List.of(s1, s2));
+        when(repo.findByTenantIdAndIsActiveTrue(TENANT_ID)).thenReturn(List.of(s1, s2));
         when(mapper.toResponse(s1)).thenReturn(mock(SalesSourceResponse.class));
         when(mapper.toResponse(s2)).thenReturn(mock(SalesSourceResponse.class));
 
         List<SalesSourceResponse> result = service.getAll();
 
         assertThat(result).hasSize(2);
-        verify(repo).findByIsActiveTrue();
+        verify(repo).findByTenantIdAndIsActiveTrue(TENANT_ID);
     }
 
     // ── create ─────────────────────────────────────────────────────────────────
@@ -74,7 +113,7 @@ class SalesSourceServiceImplTest {
         SalesSource entity = source(null, "Didi Food", new BigDecimal("12.00"));
         SalesSource saved = source(3L, "Didi Food", new BigDecimal("12.00"));
 
-        when(repo.findByNameIgnoreCase("Didi Food")).thenReturn(Optional.empty());
+        when(repo.findByNameIgnoreCaseAndTenantId("Didi Food", TENANT_ID)).thenReturn(Optional.empty());
         when(mapper.toEntity(req)).thenReturn(entity);
         when(repo.save(entity)).thenReturn(saved);
         when(mapper.toResponse(saved)).thenReturn(mock(SalesSourceResponse.class));
@@ -89,7 +128,7 @@ class SalesSourceServiceImplTest {
     @Test
     void create_nombreDuplicado_lanzaDuplicateResourceException() {
         SalesSourceRequest req = request("Rappi", new BigDecimal("15.00"));
-        when(repo.findByNameIgnoreCase("Rappi")).thenReturn(Optional.of(source(1L, "Rappi", new BigDecimal("15.00"))));
+        when(repo.findByNameIgnoreCaseAndTenantId("Rappi", TENANT_ID)).thenReturn(Optional.of(source(1L, "Rappi", new BigDecimal("15.00"))));
 
         assertThatThrownBy(() -> service.create(req))
                 .isInstanceOf(DuplicateResourceException.class)
@@ -101,7 +140,7 @@ class SalesSourceServiceImplTest {
     @Test
     void create_nombreDuplicadoCaseInsensitive_lanzaDuplicateResourceException() {
         SalesSourceRequest req = request("rappi", new BigDecimal("15.00"));
-        when(repo.findByNameIgnoreCase("rappi")).thenReturn(Optional.of(source(1L, "Rappi", new BigDecimal("15.00"))));
+        when(repo.findByNameIgnoreCaseAndTenantId("rappi", TENANT_ID)).thenReturn(Optional.of(source(1L, "Rappi", new BigDecimal("15.00"))));
 
         assertThatThrownBy(() -> service.create(req))
                 .isInstanceOf(DuplicateResourceException.class);
@@ -121,7 +160,7 @@ class SalesSourceServiceImplTest {
 
         service.update(1L, req);
 
-        verify(repo, never()).findByNameIgnoreCase(any());
+        verify(repo, never()).findByNameIgnoreCaseAndTenantId(any(), any());
         verify(repo).save(existing);
     }
 
@@ -131,13 +170,13 @@ class SalesSourceServiceImplTest {
         SalesSourceRequest req = request("Didi Food", new BigDecimal("12.00"));
 
         when(repo.findById(1L)).thenReturn(Optional.of(existing));
-        when(repo.findByNameIgnoreCase("Didi Food")).thenReturn(Optional.empty());
+        when(repo.findByNameIgnoreCaseAndTenantId("Didi Food", TENANT_ID)).thenReturn(Optional.empty());
         when(repo.save(existing)).thenReturn(existing);
         when(mapper.toResponse(existing)).thenReturn(mock(SalesSourceResponse.class));
 
         service.update(1L, req);
 
-        verify(repo).findByNameIgnoreCase("Didi Food");
+        verify(repo).findByNameIgnoreCaseAndTenantId("Didi Food", TENANT_ID);
         verify(mapper).updateEntity(req, existing);
     }
 
@@ -147,7 +186,7 @@ class SalesSourceServiceImplTest {
         SalesSourceRequest req = request("Uber Eats", new BigDecimal("20.00"));
 
         when(repo.findById(1L)).thenReturn(Optional.of(existing));
-        when(repo.findByNameIgnoreCase("Uber Eats"))
+        when(repo.findByNameIgnoreCaseAndTenantId("Uber Eats", TENANT_ID))
                 .thenReturn(Optional.of(source(2L, "Uber Eats", new BigDecimal("20.00"))));
 
         assertThatThrownBy(() -> service.update(1L, req))

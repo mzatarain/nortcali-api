@@ -2,6 +2,7 @@ package com.nortcali.api.controller;
 
 import com.nortcali.api.config.LoginRateLimiter;
 import com.nortcali.api.dto.request.LoginRequest;
+import com.nortcali.api.dto.request.RegisterRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.dto.response.LoginResponse;
 import com.nortcali.api.entity.Employee;
@@ -12,6 +13,7 @@ import com.nortcali.api.mapper.EmployeeMapper;
 import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.SessionRepository;
 import com.nortcali.api.security.JwtUtil;
+import com.nortcali.api.service.RegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -38,19 +40,22 @@ public class AuthController {
     private final EmployeeRepository employeeRepo;
     private final EmployeeMapper employeeMapper;
     private final LoginRateLimiter loginRateLimiter;
+    private final RegistrationService registrationService;
 
     public AuthController(AuthenticationManager authManager,
                           JwtUtil jwtUtil,
                           SessionRepository sessionRepo,
                           EmployeeRepository employeeRepo,
                           EmployeeMapper employeeMapper,
-                          LoginRateLimiter loginRateLimiter) {
+                          LoginRateLimiter loginRateLimiter,
+                          RegistrationService registrationService) {
         this.authManager = authManager;
         this.jwtUtil = jwtUtil;
         this.sessionRepo = sessionRepo;
         this.employeeRepo = employeeRepo;
         this.employeeMapper = employeeMapper;
         this.loginRateLimiter = loginRateLimiter;
+        this.registrationService = registrationService;
     }
 
     @PostMapping("/login")
@@ -80,6 +85,35 @@ public class AuthController {
         sessionRepo.save(session);
 
         log.info("Login exitoso para '{}'", request.getEmail());
+        return ResponseEntity.ok(new LoginResponse(token, employee.getUsername(), employee.getRole()));
+    }
+
+    /**
+     * Fase 4 (plan SaaS): alta de negocio nuevo — crea tenant + restaurante + admin inicial y
+     * responde ya autenticado (mismo shape que /login) para que el frontend continúe directo
+     * al checkout de Stripe sin pedir credenciales de nuevo.
+     */
+    @PostMapping("/register")
+    public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest request,
+                                                  HttpServletRequest httpRequest) {
+        if (!loginRateLimiter.tryConsume(httpRequest.getRemoteAddr())) {
+            throw new BusinessRuleException("Demasiados intentos. Intenta de nuevo en un minuto.");
+        }
+
+        Employee employee = registrationService.register(request);
+
+        String token = jwtUtil.generateToken(employee.getEmail(), resolveTenantId(employee));
+
+        Session session = new Session();
+        session.setToken(sha256Hex(token));
+        session.setEmployee(employee);
+        session.setIpAddress(httpRequest.getRemoteAddr());
+        session.setActive(true);
+        session.setExpiresAt(LocalDateTime.now()
+                .plusSeconds(jwtUtil.getExpiration() / 1000));
+        sessionRepo.save(session);
+
+        log.info("Registro exitoso: nuevo negocio con admin '{}'", employee.getEmail());
         return ResponseEntity.ok(new LoginResponse(token, employee.getUsername(), employee.getRole()));
     }
 

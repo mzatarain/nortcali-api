@@ -36,8 +36,8 @@ public class EmployeeRequest {
     private String email;
 
     @NotBlank(message = "El rol es obligatorio")
-    @Pattern(regexp = "ADMIN|MANAGER|CASHIER|WAITER|KITCHEN|DELIVERY",
-             message = "El rol debe ser uno de: ADMIN, MANAGER, CASHIER, WAITER, KITCHEN, DELIVERY")
+    @Pattern(regexp = "ADMIN|MANAGER|CASHIER|WAITER|KITCHEN|DELIVERY|TENANT_ADMIN",
+             message = "El rol debe ser uno de: ADMIN, MANAGER, CASHIER, WAITER, KITCHEN, DELIVERY, TENANT_ADMIN")
     private String role;
 
     private String status = "ACTIVE";

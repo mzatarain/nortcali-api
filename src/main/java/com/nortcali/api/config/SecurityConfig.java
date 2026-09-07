@@ -48,11 +48,16 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
 
                 // ── Endpoints públicos ────────────────────────────────────────
-                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout").permitAll()
+                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register").permitAll()
 .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                 // Fase 3 (plan SaaS): Stripe no manda JWT — la request se valida por firma
                 // (Stripe-Signature) dentro de BillingServiceImpl.handleWebhookEvent, no por sesión
                 .requestMatchers(HttpMethod.POST, "/api/v1/billing/webhook").permitAll()
+                // Fase 4 (plan SaaS): el formulario de registro necesita listar país/estado/
+                // ciudad sin sesión — datos de referencia, no sensibles. Debe ir antes del
+                // hasRole("ADMIN") de abajo (primer matcher que aplica gana). Escrituras
+                // (POST/PUT/DELETE) siguen restringidas a ADMIN.
+                .requestMatchers(HttpMethod.GET, "/api/v1/countries/**", "/api/v1/states/**", "/api/v1/cities/**").permitAll()
 
                 // ── Solo ADMIN ────────────────────────────────────────────────
                 // Catálogos de configuración del sistema — rara vez modificados
@@ -62,9 +67,9 @@ public class SecurityConfig {
                 // ── ADMIN o MANAGER ───────────────────────────────────────────
                 // Solo el CRUD directo del restaurante; los sub-recursos (/orders,
                 // /menu, /cash-sessions, etc.) caen en anyRequest().authenticated()
-                .requestMatchers("/api/v1/restaurants", "/api/v1/restaurants/{id}").hasAnyRole("ADMIN", "MANAGER")
-                .requestMatchers("/api/v1/units/**").hasAnyRole("ADMIN", "MANAGER")
-                .requestMatchers("/api/v1/sales-sources/**").hasAnyRole("ADMIN", "MANAGER")
+                .requestMatchers("/api/v1/restaurants", "/api/v1/restaurants/{id}").hasAnyRole("ADMIN", "MANAGER", "TENANT_ADMIN")
+                .requestMatchers("/api/v1/units/**").hasAnyRole("ADMIN", "MANAGER", "TENANT_ADMIN")
+                .requestMatchers("/api/v1/sales-sources/**").hasAnyRole("ADMIN", "MANAGER", "TENANT_ADMIN")
 
                 // ── Cualquier usuario autenticado ─────────────────────────────
                 // Operaciones del día a día: órdenes, menú, inventario,
