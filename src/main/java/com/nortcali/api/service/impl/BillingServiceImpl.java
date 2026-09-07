@@ -24,6 +24,7 @@ import com.stripe.model.Subscription;
 import com.stripe.model.billingportal.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.CustomerCreateParams;
+import com.stripe.param.SubscriptionUpdateParams;
 import com.stripe.param.billingportal.SessionCreateParams;
 import com.stripe.param.checkout.SessionCreateParams.LineItem;
 import com.stripe.param.checkout.SessionCreateParams.Mode;
@@ -71,6 +72,15 @@ public class BillingServiceImpl implements BillingService {
 
         ensureStripeCustomer(tenant, employee);
 
+        // Cambio de plan sobre una suscripción ya existente: se modifica in-place en vez de
+        // crear una Checkout Session nueva — de lo contrario cada cambio de plan apila una
+        // suscripción adicional (y un cobro adicional) sobre el mismo customer en Stripe.
+        if (tenant.getStripeSubscriptionId() != null
+                && (tenant.getStatus() == TenantStatus.ACTIVE || tenant.getStatus() == TenantStatus.PAST_DUE)) {
+            changeSubscriptionPlan(tenant, priceId, request.getPlan());
+            return new CheckoutSessionResponse(null, true);
+        }
+
         var params = com.stripe.param.checkout.SessionCreateParams.builder()
                 .setMode(Mode.SUBSCRIPTION)
                 .setCustomer(tenant.getStripeCustomerId())
@@ -89,10 +99,33 @@ public class BillingServiceImpl implements BillingService {
 
         try {
             com.stripe.model.checkout.Session session = com.stripe.model.checkout.Session.create(params);
-            return new CheckoutSessionResponse(session.getUrl());
+            return new CheckoutSessionResponse(session.getUrl(), false);
         } catch (StripeException e) {
             log.error("Error creando Checkout Session en Stripe para tenant {}: {}", tenant.getId(), e.getMessage(), e);
             throw new BusinessRuleException("No se pudo iniciar el proceso de pago. Intenta de nuevo más tarde.");
+        }
+    }
+
+    private void changeSubscriptionPlan(Tenant tenant, String priceId, String plan) {
+        try {
+            Subscription subscription = Subscription.retrieve(tenant.getStripeSubscriptionId());
+            String subscriptionItemId = subscription.getItems().getData().get(0).getId();
+
+            var params = SubscriptionUpdateParams.builder()
+                    .addItem(SubscriptionUpdateParams.Item.builder()
+                            .setId(subscriptionItemId)
+                            .setPrice(priceId)
+                            .build())
+                    .setProrationBehavior(SubscriptionUpdateParams.ProrationBehavior.CREATE_PRORATIONS)
+                    .build();
+            subscription.update(params);
+
+            tenant.setPlan(plan);
+            tenantRepo.save(tenant);
+            log.info("Tenant {} cambió de plan a '{}' (subscription={})", tenant.getId(), plan, tenant.getStripeSubscriptionId());
+        } catch (StripeException e) {
+            log.error("Error cambiando de plan en Stripe para tenant {}: {}", tenant.getId(), e.getMessage(), e);
+            throw new BusinessRuleException("No se pudo cambiar de plan. Intenta de nuevo más tarde.");
         }
     }
 
@@ -162,6 +195,7 @@ public class BillingServiceImpl implements BillingService {
         }
 
         tenant.setStripeCustomerId(session.getCustomer());
+        tenant.setStripeSubscriptionId(session.getSubscription());
         tenant.setStatus(TenantStatus.ACTIVE);
         tenant.setTrialEndsAt(null);
         Map<String, String> metadata = session.getMetadata();
@@ -187,7 +221,20 @@ public class BillingServiceImpl implements BillingService {
             log.warn("Evento de subscription sin objeto Subscription deserializable");
             return;
         }
-        applyStatus(subscription.getCustomer(), status);
+        // Un customer puede tener más de una suscripción en Stripe (histórico, pruebas, o un
+        // cambio de plan que no pasó por changeSubscriptionPlan). Solo la suscripción vigente
+        // del tenant (stripe_subscription_id) debe poder cambiar su status — de lo contrario
+        // cancelar una suscripción vieja marcaría como cancelado a un tenant que sigue activo.
+        tenantRepo.findByStripeCustomerId(subscription.getCustomer()).ifPresent(tenant -> {
+            if (!subscription.getId().equals(tenant.getStripeSubscriptionId())) {
+                log.info("Evento de subscription {} ignorado para tenant {}: no es su suscripción vigente ({})",
+                        subscription.getId(), tenant.getId(), tenant.getStripeSubscriptionId());
+                return;
+            }
+            tenant.setStatus(status);
+            tenantRepo.save(tenant);
+            log.info("Tenant {} → status {} (subscription={})", tenant.getId(), status, subscription.getId());
+        });
     }
 
     private void applyStatus(String stripeCustomerId, TenantStatus status) {
@@ -205,7 +252,18 @@ public class BillingServiceImpl implements BillingService {
 
     private StripeObject deserialize(Event event) {
         EventDataObjectDeserializer deserializer = event.getDataObjectDeserializer();
-        return deserializer.getObject().orElse(null);
+        return deserializer.getObject().orElseGet(() -> {
+            // La cuenta de Stripe puede tener una versión de API distinta a la que stripe-java
+            // trae compilada — getObject() devuelve vacío en ese caso por seguridad. Ya
+            // verificamos la firma del webhook, así que forzar la deserialización es seguro.
+            try {
+                return deserializer.deserializeUnsafe();
+            } catch (com.stripe.exception.EventDataObjectDeserializationException e) {
+                log.error("No se pudo deserializar el objeto del evento {} ({}): {}",
+                        event.getId(), event.getType(), e.getMessage());
+                return null;
+            }
+        });
     }
 
     private Tenant resolveTenantForWebhook(String clientReferenceId, String stripeCustomerId) {

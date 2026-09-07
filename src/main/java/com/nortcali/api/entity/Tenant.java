@@ -33,6 +33,9 @@ public class Tenant {
     @Column(name = "stripe_customer_id", length = 255)
     private String stripeCustomerId;
 
+    @Column(name = "stripe_subscription_id", length = 255)
+    private String stripeSubscriptionId;
+
     @Column(name = "trial_ends_at")
     private LocalDateTime trialEndsAt;
 
@@ -60,6 +63,9 @@ public class Tenant {
 
     public String getStripeCustomerId() { return stripeCustomerId; }
     public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
+
+    public String getStripeSubscriptionId() { return stripeSubscriptionId; }
+    public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
 
     public LocalDateTime getTrialEndsAt() { return trialEndsAt; }
     public void setTrialEndsAt(LocalDateTime trialEndsAt) { this.trialEndsAt = trialEndsAt; }
