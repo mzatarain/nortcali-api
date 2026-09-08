@@ -45,7 +45,14 @@ import java.util.Set;
 @Slf4j
 public class RegistrationServiceImpl implements RegistrationService {
 
-    /** Duración del trial inicial — Fase 7 (aún sin implementar) decidirá si requiere tarjeta. */
+    /**
+     * Duración del trial inicial. Fase 7 (plan SaaS, 2026-09-07): tarjeta obligatoria — este
+     * plazo es el que {@code BillingServiceImpl.createCheckoutSession} usa como {@code trial_end}
+     * absoluto al construir la Checkout Session que el frontend abre justo después del
+     * registro. El tenant queda en {@code TRIAL} desde aquí, pero de solo lectura
+     * (`RestaurantAccessInterceptor`) hasta que ese checkout se complete y la tarjeta quede
+     * registrada en Stripe.
+     */
     private static final long TRIAL_DAYS = 14;
 
     private static final List<String> STARTER_MENU_CATEGORIES = List.of(

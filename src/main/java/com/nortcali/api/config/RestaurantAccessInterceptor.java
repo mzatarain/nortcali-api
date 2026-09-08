@@ -95,6 +95,14 @@ public class RestaurantAccessInterceptor implements HandlerInterceptor {
      * {@code past_due} degrada a solo lectura (GET sigue funcionando, el resto de métodos
      * queda bloqueado con 402 hasta regularizar el pago); {@code suspended}/{@code cancelled}
      * bloquean todo, incluido GET.
+     *
+     * Fase 7 (plan SaaS, 2026-09-07): con tarjeta obligatoria desde el registro, un tenant en
+     * {@code TRIAL} que todavía no completó el Checkout de Stripe (sin
+     * {@code stripe_subscription_id}) recibe el mismo trato de solo lectura que
+     * {@code past_due} — el registro ya creó la cuenta y el JWT, pero el trial no cuenta como
+     * "activo" hasta que la tarjeta quede registrada. Los endpoints de billing
+     * (`/api/v1/billing/**`) no llevan `restaurantId` en el path, así que este interceptor no
+     * los toca — el tenant siempre puede completar el checkout desde ahí para desbloquearse.
      */
     private void checkTenantStatus(Tenant tenant, String httpMethod) {
         if (tenant == null) {
@@ -106,9 +114,13 @@ public class RestaurantAccessInterceptor implements HandlerInterceptor {
                     "La suscripción de este negocio está " + status.name().toLowerCase()
                             + ". Contacta a soporte para reactivarla.");
         }
-        if (status == TenantStatus.PAST_DUE && !"GET".equalsIgnoreCase(httpMethod)) {
+        boolean readOnly = status == TenantStatus.PAST_DUE
+                || (status == TenantStatus.TRIAL && tenant.getStripeSubscriptionId() == null);
+        if (readOnly && !"GET".equalsIgnoreCase(httpMethod)) {
             throw new PaymentRequiredException(
-                    "El pago de la suscripción está pendiente. Solo se permite consulta hasta regularizar el pago.");
+                    status == TenantStatus.TRIAL
+                            ? "Completa la configuración de tu método de pago para activar tu prueba gratuita."
+                            : "El pago de la suscripción está pendiente. Solo se permite consulta hasta regularizar el pago.");
         }
     }
 

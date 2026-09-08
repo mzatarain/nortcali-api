@@ -12,6 +12,8 @@ import org.thymeleaf.context.Context;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 
@@ -66,6 +68,14 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Problema con tu pago — NortCali", "email/payment-failed", ctx);
     }
 
+    @Override
+    public void sendTrialEndingSoon(String toEmail, String tenantName, LocalDateTime trialEndsAt) {
+        Context ctx = baseContext();
+        ctx.setVariable("tenantName", tenantName);
+        ctx.setVariable("trialEndsAt", formatDate(trialEndsAt));
+        send(toEmail, "Tu prueba gratuita termina pronto — NortCali", "email/trial-ending", ctx);
+    }
+
     private Context baseContext() {
         Context ctx = new Context();
         ctx.setVariable("frontendUrl", frontendUrl);
@@ -74,6 +84,13 @@ public class EmailServiceImpl implements EmailService {
 
     private String planLabel(String plan) {
         return plan == null ? "" : PLAN_LABELS.getOrDefault(plan, plan);
+    }
+
+    private String formatDate(LocalDateTime date) {
+        if (date == null) {
+            return "";
+        }
+        return date.format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.of("es", "MX")));
     }
 
     /** Los precios de Stripe están en MXN; amountPaid/amountDue llegan en centavos. */

@@ -6,5 +6,7 @@ public record SubscriptionStatusResponse(
         String status,
         String plan,
         LocalDateTime trialEndsAt,
-        boolean hasStripeCustomer
+        boolean hasStripeCustomer,
+        /** Fase 7 (plan SaaS): {@code true} solo cuando el checkout (con tarjeta) ya se completó. */
+        boolean hasSubscription
 ) {}

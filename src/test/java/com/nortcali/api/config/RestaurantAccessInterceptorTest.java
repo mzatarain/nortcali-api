@@ -209,6 +209,51 @@ class RestaurantAccessInterceptorTest {
         assertThat(result).isTrue();
     }
 
+    /** Fase 7 (plan SaaS): tarjeta obligatoria — TRIAL sin `stripe_subscription_id` es solo lectura. */
+    @Test
+    void tenantTrialSinSuscripcion_metodoGet_dejaPasar() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.TRIAL, null)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("GET");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void tenantTrialSinSuscripcion_metodoPost_lanzaPaymentRequiredException() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.TRIAL, null)));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("POST");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(PaymentRequiredException.class);
+    }
+
+    @Test
+    void tenantTrialConSuscripcion_metodoPost_dejaPasar() {
+        authenticateAs("cajero1");
+        withEmployeeRestaurants("cajero1",
+                Set.of(restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.TRIAL, "sub_123")));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("POST");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+    }
+
     private void authenticateAs(String email) {
         // 3 argumentos (con authorities, aunque vacías) marca el token como autenticado —
         // igual que JwtAuthFilter.doFilterInternal al construir el authToken real. El
@@ -228,11 +273,16 @@ class RestaurantAccessInterceptorTest {
     }
 
     private Restaurant restaurantWithId(Long id, Long tenantId, TenantStatus status) {
+        return restaurantWithId(id, tenantId, status, "sub_default");
+    }
+
+    private Restaurant restaurantWithId(Long id, Long tenantId, TenantStatus status, String stripeSubscriptionId) {
         Restaurant restaurant = new Restaurant();
         restaurant.setId(id);
         Tenant tenant = new Tenant();
         tenant.setId(tenantId);
         tenant.setStatus(status);
+        tenant.setStripeSubscriptionId(stripeSubscriptionId);
         restaurant.setTenant(tenant);
         return restaurant;
     }

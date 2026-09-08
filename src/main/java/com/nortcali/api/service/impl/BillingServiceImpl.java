@@ -10,7 +10,9 @@ import com.nortcali.api.entity.enums.TenantStatus;
 import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ForbiddenException;
 import com.nortcali.api.exception.ResourceNotFoundException;
+import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.repository.EmployeeRepository;
+import com.nortcali.api.repository.RestaurantRepository;
 import com.nortcali.api.repository.TenantRepository;
 import com.nortcali.api.service.BillingService;
 import com.nortcali.api.service.EmailService;
@@ -36,6 +38,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -44,6 +49,7 @@ import java.util.Map;
 public class BillingServiceImpl implements BillingService {
 
     private final TenantRepository tenantRepo;
+    private final RestaurantRepository restaurantRepo;
     private final EmployeeRepository employeeRepo;
     private final EmailService emailService;
 
@@ -62,8 +68,10 @@ public class BillingServiceImpl implements BillingService {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
-    public BillingServiceImpl(TenantRepository tenantRepo, EmployeeRepository employeeRepo, EmailService emailService) {
+    public BillingServiceImpl(TenantRepository tenantRepo, RestaurantRepository restaurantRepo,
+                               EmployeeRepository employeeRepo, EmailService emailService) {
         this.tenantRepo = tenantRepo;
+        this.restaurantRepo = restaurantRepo;
         this.employeeRepo = employeeRepo;
         this.emailService = emailService;
     }
@@ -85,6 +93,24 @@ public class BillingServiceImpl implements BillingService {
             return new CheckoutSessionResponse(null, true);
         }
 
+        var subscriptionData = com.stripe.param.checkout.SessionCreateParams.SubscriptionData.builder()
+                .putMetadata("tenantId", String.valueOf(tenant.getId()))
+                .putMetadata("plan", request.getPlan());
+
+        // Fase 7 (plan SaaS, 2026-09-07): tarjeta obligatoria desde el registro — este es el
+        // primer checkout del tenant (todavía en TRIAL, sin suscripción). Se usa `trial_end`
+        // (timestamp absoluto), no `trial_period_days`, para que el trial termine exactamente
+        // en la fecha que `RegistrationServiceImpl` ya fijó al crear la cuenta — completar el
+        // checkout tarde (o reintentarlo) no le regala días extra de prueba al tenant.
+        boolean isOnboardingCheckout = tenant.getStatus() == TenantStatus.TRIAL
+                && tenant.getStripeSubscriptionId() == null
+                && tenant.getTrialEndsAt() != null
+                && tenant.getTrialEndsAt().isAfter(LocalDateTime.now());
+        if (isOnboardingCheckout) {
+            long trialEndEpoch = tenant.getTrialEndsAt().toEpochSecond(ZoneOffset.UTC);
+            subscriptionData.setTrialEnd(trialEndEpoch);
+        }
+
         var params = com.stripe.param.checkout.SessionCreateParams.builder()
                 .setMode(Mode.SUBSCRIPTION)
                 .setCustomer(tenant.getStripeCustomerId())
@@ -94,11 +120,8 @@ public class BillingServiceImpl implements BillingService {
                 .addLineItem(LineItem.builder().setPrice(priceId).setQuantity(1L).build())
                 .setSuccessUrl(frontendUrl + "/settings/billing?checkout=success")
                 .setCancelUrl(frontendUrl + "/settings/billing?checkout=cancel")
-                .setSubscriptionData(
-                        com.stripe.param.checkout.SessionCreateParams.SubscriptionData.builder()
-                                .putMetadata("tenantId", String.valueOf(tenant.getId()))
-                                .putMetadata("plan", request.getPlan())
-                                .build())
+                .setPaymentMethodCollection(com.stripe.param.checkout.SessionCreateParams.PaymentMethodCollection.ALWAYS)
+                .setSubscriptionData(subscriptionData.build())
                 .build();
 
         try {
@@ -162,7 +185,8 @@ public class BillingServiceImpl implements BillingService {
                 tenant.getStatus().name().toLowerCase(),
                 tenant.getPlan(),
                 tenant.getTrialEndsAt(),
-                tenant.getStripeCustomerId() != null);
+                tenant.getStripeCustomerId() != null,
+                tenant.getStripeSubscriptionId() != null);
     }
 
     @Override
@@ -180,8 +204,47 @@ public class BillingServiceImpl implements BillingService {
             case "invoice.payment_succeeded" -> applyStatusFromInvoice(event, TenantStatus.ACTIVE);
             case "invoice.payment_failed" -> applyStatusFromInvoice(event, TenantStatus.PAST_DUE);
             case "customer.subscription.deleted" -> applyStatusFromSubscription(event, TenantStatus.CANCELLED);
+            case "customer.subscription.trial_will_end" -> handleTrialWillEnd(event);
             default -> log.debug("Evento de Stripe ignorado: {}", event.getType());
         }
+    }
+
+    /**
+     * Fase 7 (plan SaaS, 2026-09-07): Stripe dispara este evento ~3 días antes de que termine
+     * el trial de una suscripción (por defecto de la plataforma, no configurado por este
+     * código) — reemplaza al job programado que el plan original contemplaba para el
+     * recordatorio: es más preciso (sigue el `trial_end` real de cada suscripción, no una
+     * revisión diaria de `trial_ends_at`) y no requiere lógica propia de reintentos.
+     */
+    private void handleTrialWillEnd(Event event) {
+        StripeObject obj = deserialize(event);
+        if (!(obj instanceof Subscription subscription)) {
+            log.warn("customer.subscription.trial_will_end sin objeto Subscription deserializable");
+            return;
+        }
+        tenantRepo.findByStripeCustomerId(subscription.getCustomer()).ifPresentOrElse(
+                tenant -> {
+                    String email = resolveTenantAdminEmail(tenant);
+                    if (email == null) {
+                        log.warn("trial_will_end: tenant {} sin ningún empleado con email para notificar", tenant.getId());
+                        return;
+                    }
+                    emailService.sendTrialEndingSoon(email, tenant.getName(), tenant.getTrialEndsAt());
+                },
+                () -> log.warn("trial_will_end: ningún tenant con stripe_customer_id={}", subscription.getCustomer()));
+    }
+
+    /** Primer TENANT_ADMIN (o ADMIN, legacy) de la primera sucursal del tenant — no hay usuario autenticado en un webhook. */
+    private String resolveTenantAdminEmail(Tenant tenant) {
+        List<Restaurant> restaurants = restaurantRepo.findByTenantId(tenant.getId());
+        if (restaurants.isEmpty()) {
+            return null;
+        }
+        return employeeRepo.findByRestaurantsId(restaurants.get(0).getId()).stream()
+                .filter(e -> "TENANT_ADMIN".equals(e.getRole()) || "ADMIN".equals(e.getRole()))
+                .findFirst()
+                .map(Employee::getEmail)
+                .orElse(null);
     }
 
     private void handleCheckoutCompleted(Event event) {
@@ -200,14 +263,47 @@ public class BillingServiceImpl implements BillingService {
 
         tenant.setStripeCustomerId(session.getCustomer());
         tenant.setStripeSubscriptionId(session.getSubscription());
-        tenant.setStatus(TenantStatus.ACTIVE);
-        tenant.setTrialEndsAt(null);
         Map<String, String> metadata = session.getMetadata();
         if (metadata != null && metadata.get("plan") != null) {
             tenant.setPlan(metadata.get("plan"));
         }
+
+        // Fase 7 (plan SaaS, 2026-09-07): con tarjeta obligatoria, el checkout de onboarding
+        // crea la suscripción con `trial_end` — completarlo NO activa el cobro todavía. El
+        // tenant se queda en TRIAL (ya no bloqueado de escritura — ver
+        // RestaurantAccessInterceptor — porque ahora sí tiene stripe_subscription_id) hasta que
+        // Stripe intente el primer cobro real al terminar el trial (invoice.payment_succeeded/
+        // failed, ya manejados abajo). Un checkout sin trial (resuscripción tras cancelación,
+        // o el trial ya venció) activa de inmediato.
+        applyStatusFromSubscriptionStatus(tenant, session.getSubscription());
+
         tenantRepo.save(tenant);
-        log.info("Tenant {} activado tras checkout.session.completed (customer={})", tenant.getId(), session.getCustomer());
+        log.info("Tenant {} → status {} tras checkout.session.completed (customer={}, subscription={})",
+                tenant.getId(), tenant.getStatus(), session.getCustomer(), session.getSubscription());
+    }
+
+    private void applyStatusFromSubscriptionStatus(Tenant tenant, String subscriptionId) {
+        if (subscriptionId == null) {
+            tenant.setStatus(TenantStatus.ACTIVE);
+            tenant.setTrialEndsAt(null);
+            return;
+        }
+        try {
+            Subscription subscription = Subscription.retrieve(subscriptionId);
+            if ("trialing".equals(subscription.getStatus()) && subscription.getTrialEnd() != null) {
+                tenant.setStatus(TenantStatus.TRIAL);
+                tenant.setTrialEndsAt(
+                        LocalDateTime.ofEpochSecond(subscription.getTrialEnd(), 0, ZoneOffset.UTC));
+            } else {
+                tenant.setStatus(TenantStatus.ACTIVE);
+                tenant.setTrialEndsAt(null);
+            }
+        } catch (StripeException e) {
+            log.error("No se pudo consultar la suscripción {} en Stripe para tenant {}: {} — se asume ACTIVE",
+                    subscriptionId, tenant.getId(), e.getMessage(), e);
+            tenant.setStatus(TenantStatus.ACTIVE);
+            tenant.setTrialEndsAt(null);
+        }
     }
 
     private void applyStatusFromInvoice(Event event, TenantStatus status) {
