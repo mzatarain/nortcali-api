@@ -13,6 +13,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -60,6 +63,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (username != null &&
             SecurityContextHolder.getContext().getAuthentication() == null) {
+
+            // Fase 8 (plan SaaS): un token de superadmin no tiene fila en `employees` ni en
+            // `sessions` — se autentica directo como ROLE_SUPERADMIN a partir del propio JWT,
+            // sin tocar EmployeeDetailsService/SessionRepository. Ver JwtUtil.generateSuperadminToken.
+            if (jwtUtil.isSuperadminToken(token)) {
+                List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_SUPERADMIN"));
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             // Verificar que la sesión existe en DB, está activa y no ha expirado
             var session = sessionRepo.findByTokenAndIsActiveTrue(sha256Hex(token));

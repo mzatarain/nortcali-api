@@ -37,4 +37,20 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     /** Fase 2: misma necesidad de fetch-join que {@code findByUsernameWithRestaurants}, por email. */
     @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.restaurants r LEFT JOIN FETCH r.tenant WHERE e.email = :email")
     Optional<Employee> findByEmailWithRestaurants(@Param("email") String email);
+
+    /** Fase 8 (plan SaaS): misma necesidad de fetch-join, por id — usado al resolver el tenant para impersonar. */
+    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.restaurants r LEFT JOIN FETCH r.tenant WHERE e.id = :id")
+    Optional<Employee> findByIdWithRestaurants(@Param("id") Long id);
+
+    /** Fase 8 (plan SaaS): panel de superadmin — empleados de cualquier restaurante del tenant, sin duplicados. */
+    @Query("SELECT DISTINCT e FROM Employee e JOIN e.restaurants r WHERE r.tenant.id = :tenantId ORDER BY e.firstName, e.lastName")
+    List<Employee> findByRestaurantsTenantId(@Param("tenantId") Long tenantId);
+
+    /** Fase 8 (plan SaaS): métrica "uso" del listado de tenants — cuenta sin duplicar por multi-sucursal. */
+    @Query("SELECT COUNT(DISTINCT e) FROM Employee e JOIN e.restaurants r WHERE r.tenant.id = :tenantId")
+    long countDistinctByRestaurantsTenantId(@Param("tenantId") Long tenantId);
+
+    /** Fase 8 (plan SaaS): métrica "última conexión" del listado de tenants. */
+    @Query("SELECT MAX(e.lastLogin) FROM Employee e JOIN e.restaurants r WHERE r.tenant.id = :tenantId")
+    java.time.LocalDateTime findMaxLastLoginByRestaurantsTenantId(@Param("tenantId") Long tenantId);
 }

@@ -49,7 +49,12 @@ public class SecurityConfig {
 
                 // ── Endpoints públicos ────────────────────────────────────────
                 .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register").permitAll()
-.requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
+                // Fase 8 (plan SaaS): panel de superadmin — login público (valida contra la
+                // tabla separada `superadmins`), el resto de /superadmin/** exige ROLE_SUPERADMIN.
+                // Debe declararse antes de cualquier matcher genérico de abajo.
+                .requestMatchers(HttpMethod.POST, "/api/v1/superadmin/auth/login").permitAll()
+                .requestMatchers("/api/v1/superadmin/**").hasRole("SUPERADMIN")
                 // Fase 3 (plan SaaS): Stripe no manda JWT — la request se valida por firma
                 // (Stripe-Signature) dentro de BillingServiceImpl.handleWebhookEvent, no por sesión
                 .requestMatchers(HttpMethod.POST, "/api/v1/billing/webhook").permitAll()

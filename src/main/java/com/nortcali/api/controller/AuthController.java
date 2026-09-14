@@ -72,6 +72,9 @@ public class AuthController {
         var employee = employeeRepo.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("Employee with email: " + request.getEmail()));
 
+        employee.setLastLogin(LocalDateTime.now());
+        employeeRepo.save(employee);
+
         String token = jwtUtil.generateToken(request.getEmail(), resolveTenantId(employee));
 
         // Registrar sesión activa en tabla sessions, con fecha de expiración alineada al JWT
@@ -101,6 +104,8 @@ public class AuthController {
         }
 
         Employee employee = registrationService.register(request);
+        employee.setLastLogin(LocalDateTime.now());
+        employeeRepo.save(employee);
 
         String token = jwtUtil.generateToken(employee.getEmail(), resolveTenantId(employee));
 
@@ -141,6 +146,13 @@ public class AuthController {
 
         String authHeader = httpRequest.getHeader("Authorization");
         String oldToken = authHeader.substring(7); // "Bearer " ya validado por el filtro
+
+        // Fase 8 (plan SaaS): una sesión de impersonación no se renueva — debe expirar sola en
+        // vez de extenderse indefinidamente mientras un superadmin la tenga abierta. El
+        // superadmin vuelve a impersonar desde el panel si necesita más tiempo.
+        if (jwtUtil.getImpersonatedBy(oldToken) != null) {
+            throw new BusinessRuleException("No se puede renovar una sesión de impersonación.");
+        }
 
         // Localizar sesión activa actual (garantizado por el filtro, pero verificamos por coherencia)
         Session oldSession = sessionRepo.findByTokenAndIsActiveTrue(sha256Hex(oldToken))
