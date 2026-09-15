@@ -42,6 +42,10 @@ public class Tenant {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    /** Fase 9 (plan SaaS): última vez que {@code TenantInactivityScheduler} notificó inactividad — NULL si no hay episodio abierto. */
+    @Column(name = "inactivity_alerted_at")
+    private LocalDateTime inactivityAlertedAt;
+
     @PrePersist
     void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -72,4 +76,7 @@ public class Tenant {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getInactivityAlertedAt() { return inactivityAlertedAt; }
+    public void setInactivityAlertedAt(LocalDateTime inactivityAlertedAt) { this.inactivityAlertedAt = inactivityAlertedAt; }
 }

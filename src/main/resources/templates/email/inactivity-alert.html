@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td style="background-color:#18181b;padding:24px 32px;">
+              <span style="color:#ffffff;font-size:20px;font-weight:bold;">NortCali — Panel interno</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:32px;color:#18181b;">
+              <p style="font-size:18px;margin:0 0 16px;">Tenant inactivo</p>
+              <p style="font-size:14px;line-height:1.6;margin:0 0 16px;">
+                <strong th:text="${tenantName}">Negocio</strong> no ha tenido ninguna conexión de
+                sus empleados en los últimos <strong th:text="${daysInactive}">14</strong> días.
+                Posible riesgo de cancelación — considera contactarlo.
+              </p>
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0;">
+                <tr>
+                  <td style="background-color:#18181b;border-radius:6px;">
+                    <a th:href="${frontendUrl} + '/superadmin'" style="display:inline-block;padding:12px 24px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:bold;">
+                      Ver panel de superadmin
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

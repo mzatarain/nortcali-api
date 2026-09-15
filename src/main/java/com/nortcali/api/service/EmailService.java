@@ -19,4 +19,7 @@ public interface EmailService {
 
     /** Fase 7 (plan SaaS): disparado por el webhook {@code customer.subscription.trial_will_end} de Stripe. */
     void sendTrialEndingSoon(String toEmail, String tenantName, LocalDateTime trialEndsAt);
+
+    /** Fase 9 (plan SaaS): disparado por {@code TenantInactivityScheduler} — destinatario es un superadmin, no el tenant. */
+    void sendInactivityAlert(String toEmail, String tenantName, long daysInactive);
 }

@@ -2,6 +2,7 @@ package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.SuperadminLoginRequest;
 import com.nortcali.api.dto.response.LoginResponse;
+import com.nortcali.api.dto.response.PlatformMetricsResponse;
 import com.nortcali.api.dto.response.SuperadminEmployeeResponse;
 import com.nortcali.api.dto.response.SuperadminLoginResponse;
 import com.nortcali.api.dto.response.TenantSummaryResponse;
@@ -23,15 +24,19 @@ import com.nortcali.api.repository.TenantRepository;
 import com.nortcali.api.security.JwtUtil;
 import com.nortcali.api.service.SuperadminService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
 
@@ -48,6 +53,19 @@ public class SuperadminServiceImpl implements SuperadminService {
     private final ImpersonationAuditRepository auditRepo;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+
+    /** Fase 9 (plan SaaS): precios de plan en MXN — mismos valores que la tabla de Fase 3, para MRR sin llamar a Stripe. */
+    @Value("${billing.plan-amounts.basico}")
+    private BigDecimal planAmountBasico;
+
+    @Value("${billing.plan-amounts.pro}")
+    private BigDecimal planAmountPro;
+
+    @Value("${billing.plan-amounts.enterprise}")
+    private BigDecimal planAmountEnterprise;
+
+    @Value("${app.tenant-inactivity-threshold-days:14}")
+    private int inactivityThresholdDays;
 
     public SuperadminServiceImpl(SuperadminRepository superadminRepo,
                                   TenantRepository tenantRepo,
@@ -87,6 +105,61 @@ public class SuperadminServiceImpl implements SuperadminService {
         return tenantRepo.findAll().stream()
                 .map(this::toSummary)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PlatformMetricsResponse getMetrics() {
+        List<Tenant> all = tenantRepo.findAll();
+
+        long trial = 0, active = 0, pastDue = 0, suspended = 0, cancelled = 0, inactive = 0;
+        BigDecimal mrr = BigDecimal.ZERO;
+
+        for (Tenant tenant : all) {
+            switch (tenant.getStatus()) {
+                case TRIAL -> trial++;
+                case ACTIVE -> {
+                    active++;
+                    mrr = mrr.add(planAmount(tenant.getPlan()));
+                    if (isInactive(tenant)) {
+                        inactive++;
+                    }
+                }
+                case PAST_DUE -> pastDue++;
+                case SUSPENDED -> suspended++;
+                case CANCELLED -> cancelled++;
+            }
+        }
+
+        long everPaidOrChurned = active + pastDue + cancelled;
+        BigDecimal churnRate = everPaidOrChurned == 0
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(cancelled)
+                        .divide(BigDecimal.valueOf(everPaidOrChurned), 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))
+                        .setScale(2, RoundingMode.HALF_UP);
+
+        return new PlatformMetricsResponse(
+                all.size(), trial, active, pastDue, suspended, cancelled, mrr, churnRate, inactive);
+    }
+
+    private BigDecimal planAmount(String plan) {
+        if (plan == null) {
+            return BigDecimal.ZERO;
+        }
+        return switch (plan) {
+            case "basico" -> planAmountBasico;
+            case "pro" -> planAmountPro;
+            case "enterprise" -> planAmountEnterprise;
+            default -> BigDecimal.ZERO;
+        };
+    }
+
+    /** Fase 9: mismo criterio que {@code TenantInactivityScheduler} — última conexión de cualquier empleado del tenant, o su alta si nunca se conectó nadie. */
+    private boolean isInactive(Tenant tenant) {
+        LocalDateTime lastLogin = employeeRepo.findMaxLastLoginByRestaurantsTenantId(tenant.getId());
+        LocalDateTime baseline = lastLogin != null ? lastLogin : tenant.getCreatedAt();
+        return baseline != null && ChronoUnit.DAYS.between(baseline, LocalDateTime.now()) >= inactivityThresholdDays;
     }
 
     @Override

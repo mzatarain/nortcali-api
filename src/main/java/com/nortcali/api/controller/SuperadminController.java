@@ -3,6 +3,7 @@ package com.nortcali.api.controller;
 import com.nortcali.api.config.LoginRateLimiter;
 import com.nortcali.api.dto.request.SuperadminLoginRequest;
 import com.nortcali.api.dto.response.LoginResponse;
+import com.nortcali.api.dto.response.PlatformMetricsResponse;
 import com.nortcali.api.dto.response.SuperadminEmployeeResponse;
 import com.nortcali.api.dto.response.SuperadminLoginResponse;
 import com.nortcali.api.dto.response.TenantSummaryResponse;
@@ -41,6 +42,11 @@ public class SuperadminController {
     @GetMapping("/tenants")
     public ResponseEntity<List<TenantSummaryResponse>> listTenants() {
         return ResponseEntity.ok(superadminService.listTenants());
+    }
+
+    @GetMapping("/metrics")
+    public ResponseEntity<PlatformMetricsResponse> getMetrics() {
+        return ResponseEntity.ok(superadminService.getMetrics());
     }
 
     @PostMapping("/tenants/{tenantId}/suspend")

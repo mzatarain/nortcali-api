@@ -76,6 +76,14 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Tu prueba gratuita termina pronto — NortCali", "email/trial-ending", ctx);
     }
 
+    @Override
+    public void sendInactivityAlert(String toEmail, String tenantName, long daysInactive) {
+        Context ctx = baseContext();
+        ctx.setVariable("tenantName", tenantName);
+        ctx.setVariable("daysInactive", daysInactive);
+        send(toEmail, "Tenant inactivo — " + tenantName, "email/inactivity-alert", ctx);
+    }
+
     private Context baseContext() {
         Context ctx = new Context();
         ctx.setVariable("frontendUrl", frontendUrl);

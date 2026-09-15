@@ -18,4 +18,7 @@ public interface TenantRepository extends JpaRepository<Tenant, Long> {
      * trial venció sin que ningún webhook de Stripe los haya movido de {@code TRIAL} todavía.
      */
     List<Tenant> findByStatusAndTrialEndsAtBefore(TenantStatus status, LocalDateTime cutoff);
+
+    /** Fase 9 (plan SaaS): usado para MRR/churn (agrupando en memoria) y por {@code TenantInactivityScheduler}. */
+    List<Tenant> findByStatus(TenantStatus status);
 }

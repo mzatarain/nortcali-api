@@ -2,6 +2,7 @@ package com.nortcali.api.service;
 
 import com.nortcali.api.dto.request.SuperadminLoginRequest;
 import com.nortcali.api.dto.response.LoginResponse;
+import com.nortcali.api.dto.response.PlatformMetricsResponse;
 import com.nortcali.api.dto.response.SuperadminEmployeeResponse;
 import com.nortcali.api.dto.response.SuperadminLoginResponse;
 import com.nortcali.api.dto.response.TenantSummaryResponse;
@@ -13,6 +14,9 @@ public interface SuperadminService {
     SuperadminLoginResponse login(SuperadminLoginRequest request);
 
     List<TenantSummaryResponse> listTenants();
+
+    /** Fase 9 (plan SaaS): MRR, churn y conteos por estado — ver {@link PlatformMetricsResponse}. */
+    PlatformMetricsResponse getMetrics();
 
     void suspendTenant(Long tenantId);
 
