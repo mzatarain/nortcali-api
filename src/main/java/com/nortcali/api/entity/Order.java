@@ -72,6 +72,10 @@ public class Order {
     @JoinColumn(name = "driver_id")
     private DeliveryDriver driver;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "table_id")
+    private DiningTable table;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> items = new ArrayList<>();
 
@@ -132,6 +136,9 @@ public class Order {
 
     public DeliveryDriver getDriver() { return driver; }
     public void setDriver(DeliveryDriver driver) { this.driver = driver; }
+
+    public DiningTable getTable() { return table; }
+    public void setTable(DiningTable table) { this.table = table; }
 
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }

@@ -20,6 +20,8 @@ public record OrderResponse(
         String employeeUsername,
         Long driverId,
         String driverFirstName,
+        Long tableId,
+        String tableName,
         LocalDateTime createdAt,
         LocalDateTime preparingAt,
         LocalDateTime readyAt,

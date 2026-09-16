@@ -24,6 +24,8 @@ public class OrderRequest {
 
     private Long driverId;
 
+    private Long tableId;
+
     private String paymentMethod;
 
     @Size(max = 1000, message = "Las notas no pueden superar los 1000 caracteres")
@@ -44,6 +46,9 @@ public class OrderRequest {
 
     public Long getDriverId() { return driverId; }
     public void setDriverId(Long driverId) { this.driverId = driverId; }
+
+    public Long getTableId() { return tableId; }
+    public void setTableId(Long tableId) { this.tableId = tableId; }
 
     public String getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }

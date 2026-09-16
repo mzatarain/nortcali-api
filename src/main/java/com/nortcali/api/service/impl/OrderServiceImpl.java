@@ -8,6 +8,7 @@ import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.OrderMapper;
 import com.nortcali.api.repository.*;
+import com.nortcali.api.service.DiningTableService;
 import com.nortcali.api.service.InventoryMovementService;
 import com.nortcali.api.service.OrderService;
 import com.nortcali.api.service.SaleService;
@@ -60,6 +61,7 @@ public class OrderServiceImpl implements OrderService {
     private final RecipeRepository recipeRepo;
     private final InventoryMovementService inventoryService;
     private final SaleService saleService;
+    private final DiningTableService diningTableService;
     private final OrderMapper mapper;
 
     public OrderServiceImpl(OrderRepository orderRepo,
@@ -75,6 +77,7 @@ public class OrderServiceImpl implements OrderService {
                             RecipeRepository recipeRepo,
                             InventoryMovementService inventoryService,
                             SaleService saleService,
+                            DiningTableService diningTableService,
                             OrderMapper mapper) {
         this.orderRepo = orderRepo;
         this.historyRepo = historyRepo;
@@ -89,6 +92,7 @@ public class OrderServiceImpl implements OrderService {
         this.recipeRepo = recipeRepo;
         this.inventoryService = inventoryService;
         this.saleService = saleService;
+        this.diningTableService = diningTableService;
         this.mapper = mapper;
     }
 
@@ -169,6 +173,14 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new ResourceNotFoundException("DeliveryDriver", request.getDriverId())));
         }
 
+        // Mesa obligatoria para dine_in — ocupación automática al crear la orden
+        if (order.getOrderType() == OrderType.DINE_IN) {
+            if (request.getTableId() == null) {
+                throw new BusinessRuleException("La mesa es obligatoria para órdenes dine_in");
+            }
+            order.setTable(diningTableService.occupy(request.getTableId(), restaurantId));
+        }
+
         // Construir items y calcular total (el subtotal de cada item ya incluye modificadores)
         List<OrderItem> items = buildItems(request.getItems(), order);
         BigDecimal total = items.stream()
@@ -236,6 +248,12 @@ public class OrderServiceImpl implements OrderService {
         // Al confirmar: descontar insumos del inventario
         if (newStatus == OrderStatus.CONFIRMED) {
             deductInventory(order);
+        }
+
+        // Liberar la mesa al finalizar la orden (entregada o cancelada)
+        if (order.getTable() != null
+                && (newStatus == OrderStatus.DELIVERED || newStatus == OrderStatus.CANCELLED)) {
+            diningTableService.release(order.getTable().getId());
         }
 
         // Al entregar: crear venta automáticamente (transacción independiente — fallo no revierte el estado)
@@ -316,6 +334,10 @@ public class OrderServiceImpl implements OrderService {
             order.setStatus(OrderStatus.DELIVERED);
             orderRepo.save(order);
             saveHistory(order, previousStatus, OrderStatus.DELIVERED, order.getEmployee());
+
+            if (order.getTable() != null) {
+                diningTableService.release(order.getTable().getId());
+            }
 
             if (saleService.findSaleIdByOrderId(order.getId()).isEmpty()) {
                 try {

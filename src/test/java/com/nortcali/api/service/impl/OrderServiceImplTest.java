@@ -11,6 +11,7 @@ import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.mapper.OrderMapper;
 import com.nortcali.api.repository.*;
+import com.nortcali.api.service.DiningTableService;
 import com.nortcali.api.service.InventoryMovementService;
 import com.nortcali.api.service.SaleService;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +57,7 @@ class OrderServiceImplTest {
     @Mock RecipeRepository recipeRepo;
     @Mock InventoryMovementService inventoryService;
     @Mock SaleService saleService;
+    @Mock DiningTableService diningTableService;
     @Mock OrderMapper mapper;
 
     @InjectMocks
@@ -155,9 +157,14 @@ class OrderServiceImplTest {
         when(historyRepo.save(any())).thenReturn(new OrderStatusHistory());
         when(mapper.toResponse(any(Order.class), any())).thenReturn(mock(OrderResponse.class));
 
+        DiningTable table = new DiningTable();
+        table.setId(7L);
+        when(diningTableService.occupy(7L, restaurantId)).thenReturn(table);
+
         OrderRequest request = new OrderRequest();
         request.setOrderType("dine_in");
         request.setSource("pos");
+        request.setTableId(7L);
         request.setItems(List.of(itemRequest(menuItemId, 2, price)));
 
         service.create(restaurantId, request);

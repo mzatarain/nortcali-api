@@ -20,6 +20,8 @@ public interface OrderMapper {
     @Mapping(source = "employee.username", target = "employeeUsername")
     @Mapping(source = "driver.id", target = "driverId")
     @Mapping(source = "driver.firstName", target = "driverFirstName")
+    @Mapping(source = "table.id", target = "tableId")
+    @Mapping(source = "table.name", target = "tableName")
     @Mapping(target = "saleId", ignore = true)
     OrderResponse toResponse(Order entity);
 
@@ -27,7 +29,7 @@ public interface OrderMapper {
         OrderResponse r = toResponse(entity);
         return new OrderResponse(r.id(), r.restaurantId(), r.folio(), r.orderType(), r.source(),
                 r.status(), r.total(), r.paymentMethod(), r.customerId(), r.customerFirstName(), r.customerPhone(),
-                r.employeeId(), r.employeeUsername(), r.driverId(), r.driverFirstName(),
+                r.employeeId(), r.employeeUsername(), r.driverId(), r.driverFirstName(), r.tableId(), r.tableName(),
                 r.createdAt(), r.preparingAt(), r.readyAt(), r.preparationTimeSeconds(), r.items(), saleId, r.notes());
     }
 
