@@ -8,5 +8,7 @@ public record SubscriptionStatusResponse(
         LocalDateTime trialEndsAt,
         boolean hasStripeCustomer,
         /** Fase 7 (plan SaaS): {@code true} solo cuando el checkout (con tarjeta) ya se completó. */
-        boolean hasSubscription
+        boolean hasSubscription,
+        /** {@code true} cuando la suscripción fue cancelada pero sigue activa hasta el fin del periodo pagado. */
+        boolean cancelAtPeriodEnd
 ) {}

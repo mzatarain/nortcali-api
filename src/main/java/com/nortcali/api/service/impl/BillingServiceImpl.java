@@ -181,12 +181,43 @@ public class BillingServiceImpl implements BillingService {
     @Transactional(readOnly = true)
     public SubscriptionStatusResponse getSubscriptionStatus() {
         Tenant tenant = resolveAuthenticatedTenant(resolveAuthenticatedEmployee());
+        return toSubscriptionStatusResponse(tenant);
+    }
+
+    @Override
+    public SubscriptionStatusResponse cancelSubscription() {
+        Tenant tenant = resolveAuthenticatedTenant(resolveAuthenticatedEmployee());
+        if (tenant.getStripeSubscriptionId() == null) {
+            throw new BusinessRuleException("Este negocio no tiene una suscripción activa para cancelar");
+        }
+
+        try {
+            Subscription subscription = Subscription.retrieve(tenant.getStripeSubscriptionId());
+            subscription.update(SubscriptionUpdateParams.builder()
+                    .setCancelAtPeriodEnd(true)
+                    .build());
+        } catch (StripeException e) {
+            log.error("Error cancelando suscripción en Stripe para tenant {}: {}", tenant.getId(), e.getMessage(), e);
+            throw new BusinessRuleException("No se pudo cancelar la suscripción. Intenta de nuevo más tarde.");
+        }
+
+        // No se cancela de inmediato: el tenant conserva acceso hasta el fin del periodo ya
+        // pagado. El status real (ACTIVE → CANCELLED) llega después vía el webhook
+        // customer.subscription.deleted cuando Stripe cierra el periodo.
+        tenant.setCancelAtPeriodEnd(true);
+        tenantRepo.save(tenant);
+        log.info("Tenant {} canceló su suscripción {} (efectiva al fin del periodo)", tenant.getId(), tenant.getStripeSubscriptionId());
+        return toSubscriptionStatusResponse(tenant);
+    }
+
+    private SubscriptionStatusResponse toSubscriptionStatusResponse(Tenant tenant) {
         return new SubscriptionStatusResponse(
                 tenant.getStatus().name().toLowerCase(),
                 tenant.getPlan(),
                 tenant.getTrialEndsAt(),
                 tenant.getStripeCustomerId() != null,
-                tenant.getStripeSubscriptionId() != null);
+                tenant.getStripeSubscriptionId() != null,
+                tenant.isCancelAtPeriodEnd());
     }
 
     @Override
@@ -204,6 +235,7 @@ public class BillingServiceImpl implements BillingService {
             case "invoice.payment_succeeded" -> applyStatusFromInvoice(event, TenantStatus.ACTIVE);
             case "invoice.payment_failed" -> applyStatusFromInvoice(event, TenantStatus.PAST_DUE);
             case "customer.subscription.deleted" -> applyStatusFromSubscription(event, TenantStatus.CANCELLED);
+            case "customer.subscription.updated" -> handleSubscriptionUpdated(event);
             case "customer.subscription.trial_will_end" -> handleTrialWillEnd(event);
             default -> log.debug("Evento de Stripe ignorado: {}", event.getType());
         }
@@ -263,6 +295,7 @@ public class BillingServiceImpl implements BillingService {
 
         tenant.setStripeCustomerId(session.getCustomer());
         tenant.setStripeSubscriptionId(session.getSubscription());
+        tenant.setCancelAtPeriodEnd(false);
         Map<String, String> metadata = session.getMetadata();
         if (metadata != null && metadata.get("plan") != null) {
             tenant.setPlan(metadata.get("plan"));
@@ -354,8 +387,37 @@ public class BillingServiceImpl implements BillingService {
                 return;
             }
             tenant.setStatus(status);
+            if (status == TenantStatus.CANCELLED) {
+                // La cancelación ya es definitiva — la bandera de "pendiente de cancelar" deja de aplicar.
+                tenant.setCancelAtPeriodEnd(false);
+            }
             tenantRepo.save(tenant);
             log.info("Tenant {} → status {} (subscription={})", tenant.getId(), status, subscription.getId());
+        });
+    }
+
+    /**
+     * Mantiene `cancel_at_period_end` sincronizado con Stripe — cubre tanto la cancelación
+     * hecha desde esta app (ya se guarda de forma optimista en {@link #cancelSubscription()})
+     * como una cancelación o reactivación hecha directamente desde el Billing Portal de Stripe.
+     */
+    private void handleSubscriptionUpdated(Event event) {
+        StripeObject obj = deserialize(event);
+        if (!(obj instanceof Subscription subscription)) {
+            log.warn("customer.subscription.updated sin objeto Subscription deserializable");
+            return;
+        }
+        tenantRepo.findByStripeCustomerId(subscription.getCustomer()).ifPresent(tenant -> {
+            if (!subscription.getId().equals(tenant.getStripeSubscriptionId())) {
+                return;
+            }
+            boolean cancelAtPeriodEnd = Boolean.TRUE.equals(subscription.getCancelAtPeriodEnd());
+            if (tenant.isCancelAtPeriodEnd() != cancelAtPeriodEnd) {
+                tenant.setCancelAtPeriodEnd(cancelAtPeriodEnd);
+                tenantRepo.save(tenant);
+                log.info("Tenant {} → cancelAtPeriodEnd={} (subscription={})",
+                        tenant.getId(), cancelAtPeriodEnd, subscription.getId());
+            }
         });
     }
 

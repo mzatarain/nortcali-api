@@ -43,6 +43,12 @@ public class BillingController {
         return ResponseEntity.ok(billingService.getSubscriptionStatus());
     }
 
+    @PostMapping("/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TENANT_ADMIN')")
+    public ResponseEntity<SubscriptionStatusResponse> cancelSubscription() {
+        return ResponseEntity.ok(billingService.cancelSubscription());
+    }
+
     /**
      * Público a nivel Spring Security (`permitAll` en {@code SecurityConfig}) — Stripe no manda
      * JWT. La autenticidad de la request se valida por firma (`Stripe-Signature`), no por sesión.

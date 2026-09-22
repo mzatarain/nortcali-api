@@ -36,6 +36,9 @@ public class Tenant {
     @Column(name = "stripe_subscription_id", length = 255)
     private String stripeSubscriptionId;
 
+    @Column(name = "cancel_at_period_end", nullable = false)
+    private boolean cancelAtPeriodEnd = false;
+
     @Column(name = "trial_ends_at")
     private LocalDateTime trialEndsAt;
 
@@ -70,6 +73,9 @@ public class Tenant {
 
     public String getStripeSubscriptionId() { return stripeSubscriptionId; }
     public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
+
+    public boolean isCancelAtPeriodEnd() { return cancelAtPeriodEnd; }
+    public void setCancelAtPeriodEnd(boolean cancelAtPeriodEnd) { this.cancelAtPeriodEnd = cancelAtPeriodEnd; }
 
     public LocalDateTime getTrialEndsAt() { return trialEndsAt; }
     public void setTrialEndsAt(LocalDateTime trialEndsAt) { this.trialEndsAt = trialEndsAt; }
