@@ -28,7 +28,7 @@ public class Employee {
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String username;
 
     @Column(name = "password_hash", nullable = false)
@@ -57,6 +57,11 @@ public class Employee {
 
     @Column(name = "restaurant_id")
     private Long restaurantId;
+
+    /** Fase SaaS: denormalizado (mismo patrón que restaurantId) — permite escopar la unicidad
+     *  de username por tenant vía la constraint compuesta uq_employees_tenant_username (V29). */
+    @Column(name = "tenant_id", nullable = false)
+    private Long tenantId;
 
     /* ==============
      * RELATIONSHIPS
@@ -112,6 +117,9 @@ public class Employee {
 
     public Long getRestaurantId() { return restaurantId; }
     public void setRestaurantId(Long restaurantId) { this.restaurantId = restaurantId; }
+
+    public Long getTenantId() { return tenantId; }
+    public void setTenantId(Long tenantId) { this.tenantId = tenantId; }
 
     public Set<Restaurant> getRestaurant() { return restaurants; }
     public void setRestaurant(Set<Restaurant> restaurants) { this.restaurants = restaurants; }

@@ -12,7 +12,10 @@ import java.util.Optional;
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
-    Optional<Employee> findByUsername(String username);
+    /** Fase SaaS: username escopado por tenant (V29) — reemplaza al antiguo findByUsername
+     *  global (retirado con esta migración) en el check de duplicado de
+     *  EmployeeServiceImpl.create() y RegistrationServiceImpl.generateUsername. */
+    Optional<Employee> findByTenantIdAndUsername(Long tenantId, String username);
 
     /**
      * Fase 2 (plan SaaS): identificador de login — reemplaza a {@code findByUsername} en todo

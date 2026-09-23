@@ -127,7 +127,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         Employee employee = new Employee();
         employee.setFirstName(request.getAdminFirstName());
         employee.setLastName(request.getAdminLastName());
-        employee.setUsername(generateUsername(request.getAdminEmail()));
+        employee.setUsername(generateUsername(request.getAdminEmail(), tenant.getId()));
         employee.setPassword(passwordEncoder.encode(request.getAdminPassword()));
         employee.setPhone(request.getAdminPhone());
         employee.setEmail(request.getAdminEmail());
@@ -138,6 +138,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         restaurants.add(restaurant);
         employee.setRestaurant(restaurants);
         employee.setRestaurantId(restaurant.getId());
+        employee.setTenantId(tenant.getId());
         employee = employeeRepo.save(employee);
 
         seedCatalogs(tenant, restaurant);
@@ -191,7 +192,7 @@ public class RegistrationServiceImpl implements RegistrationService {
      * `employees.username` sigue siendo `NOT NULL UNIQUE` aunque ya no se usa para login (Fase
      * 2) — se deriva del correo y se desambigua con un sufijo numérico si ya existe.
      */
-    private String generateUsername(String email) {
+    private String generateUsername(String email, Long tenantId) {
         String base = email.substring(0, email.indexOf('@'))
                 .toLowerCase()
                 .replaceAll("[^a-z0-9]", "");
@@ -200,7 +201,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
         String candidate = base;
         int suffix = 1;
-        while (employeeRepo.findByUsername(candidate).isPresent()) {
+        while (employeeRepo.findByTenantIdAndUsername(tenantId, candidate).isPresent()) {
             candidate = base + suffix++;
         }
         return candidate;
