@@ -11,6 +11,7 @@ import com.nortcali.api.mapper.EmployeeMapper;
 import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.RestaurantRepository;
 import com.nortcali.api.service.EmployeeService;
+import com.nortcali.api.service.PlanLimits;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,10 +61,14 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public EmployeeResponse create(Long restaurantId, EmployeeRequest request) {
-        restaurantRepo.findById(restaurantId)
+        var targetRestaurant = restaurantRepo.findById(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Restaurant", restaurantId));
+        var tenant = targetRestaurant.getTenant();
+        enforceEmployeeLimit(tenant);
 
-        if (employeeRepo.findByUsername(request.getUsername()).isPresent()) {
+        // Fase SaaS: username escopado por tenant (V29) — dos negocios distintos pueden tener
+        // cada uno un empleado con el mismo username sin chocar.
+        if (employeeRepo.findByTenantIdAndUsername(tenant.getId(), request.getUsername()).isPresent()) {
             throw new DuplicateResourceException("Ya existe un empleado con el username '" + request.getUsername() + "'");
         }
         // Fase 2 (plan SaaS): email es el identificador de login — employees.email tiene
@@ -93,6 +98,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         restaurants.add(restaurant);
         employee.setRestaurant(restaurants);
         employee.setRestaurantId(restaurantId);
+        employee.setTenantId(tenant.getId());
 
         log.info("Creando empleado '{}' para restaurante {}", request.getUsername(), restaurantId);
         return mapper.toResponse(employeeRepo.save(employee));
@@ -133,6 +139,16 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setStatus(request.getStatus());
         log.info("Empleado {} cambió status a {}", id, request.getStatus());
         return mapper.toResponse(employeeRepo.save(employee));
+    }
+
+    /** Fase 11 (plan SaaS): límite de empleados por plan — cuenta por tenant, no por restaurante. */
+    private void enforceEmployeeLimit(com.nortcali.api.entity.Tenant tenant) {
+        PlanLimits limits = PlanLimits.fromPlan(tenant.getPlan());
+        long current = employeeRepo.countDistinctActiveByRestaurantsTenantId(tenant.getId());
+        if (current >= limits.getMaxEmployees()) {
+            throw new BusinessRuleException("Tu plan " + limits.getDisplayName() + " permite hasta "
+                    + limits.getMaxEmployees() + " empleados — actualiza de plan para agregar más.");
+        }
     }
 
     private void enforceRoleCeiling(String requestedRole) {

@@ -12,6 +12,7 @@ import com.nortcali.api.mapper.RestaurantMapper;
 import com.nortcali.api.repository.CityRepository;
 import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.RestaurantRepository;
+import com.nortcali.api.service.PlanLimits;
 import com.nortcali.api.service.RestaurantService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -60,11 +61,23 @@ public class RestaurantServiceImpl implements RestaurantService {
     public RestaurantResponse create(RestaurantRequest request) {
         var city = cityRepo.findById(request.getCityId())
                 .orElseThrow(() -> new ResourceNotFoundException("City", request.getCityId()));
+        Tenant tenant = resolveAuthenticatedTenant();
+        enforceRestaurantLimit(tenant);
 
         Restaurant entity = mapper.toEntity(request);
         setLocation(entity, city);
-        entity.setTenant(resolveAuthenticatedTenant());
+        entity.setTenant(tenant);
         return mapper.toResponse(restaurantRepo.save(entity));
+    }
+
+    /** Fase 11 (plan SaaS): límite de restaurantes por plan. */
+    private void enforceRestaurantLimit(Tenant tenant) {
+        PlanLimits limits = PlanLimits.fromPlan(tenant.getPlan());
+        long current = restaurantRepo.countByTenantIdAndIsActiveTrue(tenant.getId());
+        if (current >= limits.getMaxRestaurants()) {
+            throw new BusinessRuleException("Tu plan " + limits.getDisplayName() + " permite hasta "
+                    + limits.getMaxRestaurants() + " restaurante(s) — actualiza de plan para agregar más.");
+        }
     }
 
     /**

@@ -53,6 +53,10 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     @Query("SELECT COUNT(DISTINCT e) FROM Employee e JOIN e.restaurants r WHERE r.tenant.id = :tenantId")
     long countDistinctByRestaurantsTenantId(@Param("tenantId") Long tenantId);
 
+    /** Fase 11 (plan SaaS): cuenta para enforcement de límites por plan — solo empleados con status ACTIVE, sin duplicar por multi-sucursal. */
+    @Query("SELECT COUNT(DISTINCT e) FROM Employee e JOIN e.restaurants r WHERE r.tenant.id = :tenantId AND e.status = 'ACTIVE'")
+    long countDistinctActiveByRestaurantsTenantId(@Param("tenantId") Long tenantId);
+
     /** Fase 8 (plan SaaS): métrica "última conexión" del listado de tenants. */
     @Query("SELECT MAX(e.lastLogin) FROM Employee e JOIN e.restaurants r WHERE r.tenant.id = :tenantId")
     java.time.LocalDateTime findMaxLastLoginByRestaurantsTenantId(@Param("tenantId") Long tenantId);
