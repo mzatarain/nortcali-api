@@ -271,6 +271,39 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public OrderResponse addItems(Long restaurantId, Long orderId, AddOrderItemsRequest request) {
+        Order order = findOrThrow(orderId);
+        if (!order.getRestaurant().getId().equals(restaurantId)) {
+            throw new ResourceNotFoundException("Order", orderId);
+        }
+
+        Set<OrderStatus> editableStatuses = EnumSet.of(
+                OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY);
+        if (!editableStatuses.contains(order.getStatus())) {
+            throw new BusinessRuleException(
+                    "No se pueden agregar platillos a una orden " + order.getStatus().name().toLowerCase());
+        }
+
+        List<OrderItem> newItems = buildItems(request.getItems(), order);
+        order.getItems().addAll(newItems);
+
+        BigDecimal total = order.getItems().stream()
+                .map(OrderItem::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        order.setTotal(total);
+
+        orderRepo.save(order);
+
+        // Solo se descuenta el inventario de los platillos recién agregados —
+        // los ya existentes se descontaron al crear la orden.
+        deductInventoryForItems(order, newItems);
+
+        log.info("{} ítem(s) agregado(s) a la orden {} (restaurante {})",
+                newItems.size(), order.getFolio(), restaurantId);
+        return toOrderResponse(order);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<OrderStatusHistoryResponse> getHistory(Long restaurantId, Long orderId) {
         Order order = findOrThrow(orderId);
@@ -423,8 +456,12 @@ public class OrderServiceImpl implements OrderService {
      * Si el stock cae bajo el mínimo se loguea una alerta pero no se bloquea.
      */
     private void deductInventory(Order order) {
+        deductInventoryForItems(order, order.getItems());
+    }
+
+    private void deductInventoryForItems(Order order, List<OrderItem> items) {
         Long restaurantId = order.getRestaurant().getId();
-        for (OrderItem item : order.getItems()) {
+        for (OrderItem item : items) {
             Long menuItemId = item.getMenuItem().getId();
             Long employeeId = order.getEmployee().getId();
 

@@ -1,5 +1,6 @@
 package com.nortcali.api.controller;
 
+import com.nortcali.api.dto.request.AddOrderItemsRequest;
 import com.nortcali.api.dto.request.OrderRequest;
 import com.nortcali.api.dto.request.OrderStatusUpdateRequest;
 import com.nortcali.api.dto.request.PaymentRequest;
@@ -54,6 +55,13 @@ public class OrderController {
                                                 @Valid @RequestBody OrderRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(orderService.create(restaurantId, request));
+    }
+
+    @PostMapping("/restaurants/{restaurantId}/orders/{id}/items")
+    public ResponseEntity<OrderResponse> addItems(@PathVariable Long restaurantId,
+                                                  @PathVariable Long id,
+                                                  @Valid @RequestBody AddOrderItemsRequest request) {
+        return ResponseEntity.ok(orderService.addItems(restaurantId, id, request));
     }
 
     @PutMapping("/restaurants/{restaurantId}/orders/{id}/status")

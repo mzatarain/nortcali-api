@@ -1,5 +1,6 @@
 package com.nortcali.api.service;
 
+import com.nortcali.api.dto.request.AddOrderItemsRequest;
 import com.nortcali.api.dto.request.OrderRequest;
 import com.nortcali.api.dto.request.OrderStatusUpdateRequest;
 import com.nortcali.api.dto.request.PaymentRequest;
@@ -22,6 +23,8 @@ public interface OrderService {
     OrderResponse create(Long restaurantId, OrderRequest request);
 
     OrderResponse updateStatus(Long restaurantId, Long id, OrderStatusUpdateRequest request);
+
+    OrderResponse addItems(Long restaurantId, Long orderId, AddOrderItemsRequest request);
 
     List<OrderStatusHistoryResponse> getHistory(Long restaurantId, Long orderId);
 
