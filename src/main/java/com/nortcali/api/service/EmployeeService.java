@@ -2,6 +2,7 @@ package com.nortcali.api.service;
 
 import com.nortcali.api.dto.request.EmployeeRequest;
 import com.nortcali.api.dto.request.EmployeeStatusRequest;
+import com.nortcali.api.dto.request.EmployeeUpdateRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 
 import java.util.List;
@@ -14,7 +15,7 @@ public interface EmployeeService {
 
     EmployeeResponse create(Long restaurantId, EmployeeRequest request);
 
-    EmployeeResponse update(Long restaurantId, Long id, EmployeeRequest request);
+    EmployeeResponse update(Long restaurantId, Long id, EmployeeUpdateRequest request);
 
     EmployeeResponse updateStatus(Long restaurantId, Long id, EmployeeStatusRequest request);
 }

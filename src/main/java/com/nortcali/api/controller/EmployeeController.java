@@ -2,6 +2,7 @@ package com.nortcali.api.controller;
 
 import com.nortcali.api.dto.request.EmployeeRequest;
 import com.nortcali.api.dto.request.EmployeeStatusRequest;
+import com.nortcali.api.dto.request.EmployeeUpdateRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.service.EmployeeService;
 import jakarta.validation.Valid;
@@ -47,7 +48,7 @@ public class EmployeeController {
     @PutMapping("/restaurants/{restaurantId}/employees/{id}")
     public ResponseEntity<EmployeeResponse> update(@PathVariable Long restaurantId,
                                                    @PathVariable Long id,
-                                                   @Valid @RequestBody EmployeeRequest request) {
+                                                   @Valid @RequestBody EmployeeUpdateRequest request) {
         return ResponseEntity.ok(employeeService.update(restaurantId, id, request));
     }
 

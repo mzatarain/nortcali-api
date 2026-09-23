@@ -2,6 +2,7 @@ package com.nortcali.api.service.impl;
 
 import com.nortcali.api.dto.request.EmployeeRequest;
 import com.nortcali.api.dto.request.EmployeeStatusRequest;
+import com.nortcali.api.dto.request.EmployeeUpdateRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.entity.Employee;
 import com.nortcali.api.exception.BusinessRuleException;
@@ -105,7 +106,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
-    public EmployeeResponse update(Long restaurantId, Long id, EmployeeRequest request) {
+    public EmployeeResponse update(Long restaurantId, Long id, EmployeeUpdateRequest request) {
         Employee employee = findOrThrow(id);
         if (!employee.getRestaurantId().equals(restaurantId)) {
             throw new ResourceNotFoundException("Employee", id);
