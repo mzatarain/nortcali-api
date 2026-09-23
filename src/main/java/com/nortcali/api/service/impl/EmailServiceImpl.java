@@ -84,6 +84,14 @@ public class EmailServiceImpl implements EmailService {
         send(toEmail, "Tenant inactivo — " + tenantName, "email/inactivity-alert", ctx);
     }
 
+    @Override
+    public void sendPasswordReset(String toEmail, String employeeName, String resetLink) {
+        Context ctx = baseContext();
+        ctx.setVariable("employeeName", employeeName);
+        ctx.setVariable("resetLink", resetLink);
+        send(toEmail, "Recupera tu contraseña — NortCali", "email/password-reset", ctx);
+    }
+
     private Context baseContext() {
         Context ctx = new Context();
         ctx.setVariable("frontendUrl", frontendUrl);

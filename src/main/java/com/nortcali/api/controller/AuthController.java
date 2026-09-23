@@ -1,8 +1,10 @@
 package com.nortcali.api.controller;
 
 import com.nortcali.api.config.LoginRateLimiter;
+import com.nortcali.api.dto.request.ForgotPasswordRequest;
 import com.nortcali.api.dto.request.LoginRequest;
 import com.nortcali.api.dto.request.RegisterRequest;
+import com.nortcali.api.dto.request.ResetPasswordRequest;
 import com.nortcali.api.dto.response.EmployeeResponse;
 import com.nortcali.api.dto.response.LoginResponse;
 import com.nortcali.api.entity.Employee;
@@ -13,6 +15,7 @@ import com.nortcali.api.mapper.EmployeeMapper;
 import com.nortcali.api.repository.EmployeeRepository;
 import com.nortcali.api.repository.SessionRepository;
 import com.nortcali.api.security.JwtUtil;
+import com.nortcali.api.service.PasswordResetService;
 import com.nortcali.api.service.RegistrationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -41,6 +44,7 @@ public class AuthController {
     private final EmployeeMapper employeeMapper;
     private final LoginRateLimiter loginRateLimiter;
     private final RegistrationService registrationService;
+    private final PasswordResetService passwordResetService;
 
     public AuthController(AuthenticationManager authManager,
                           JwtUtil jwtUtil,
@@ -48,7 +52,8 @@ public class AuthController {
                           EmployeeRepository employeeRepo,
                           EmployeeMapper employeeMapper,
                           LoginRateLimiter loginRateLimiter,
-                          RegistrationService registrationService) {
+                          RegistrationService registrationService,
+                          PasswordResetService passwordResetService) {
         this.authManager = authManager;
         this.jwtUtil = jwtUtil;
         this.sessionRepo = sessionRepo;
@@ -56,6 +61,7 @@ public class AuthController {
         this.employeeMapper = employeeMapper;
         this.loginRateLimiter = loginRateLimiter;
         this.registrationService = registrationService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/login")
@@ -135,6 +141,27 @@ public class AuthController {
             });
         }
         SecurityContextHolder.clearContext();
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Recuperación de contraseña — siempre 204, exista o no el email (no filtra qué correos están registrados). */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+                                               HttpServletRequest httpRequest) {
+        if (!loginRateLimiter.tryConsume(httpRequest.getRemoteAddr())) {
+            throw new BusinessRuleException("Demasiados intentos. Intenta de nuevo en un minuto.");
+        }
+        passwordResetService.requestReset(request.getEmail());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request,
+                                              HttpServletRequest httpRequest) {
+        if (!loginRateLimiter.tryConsume(httpRequest.getRemoteAddr())) {
+            throw new BusinessRuleException("Demasiados intentos. Intenta de nuevo en un minuto.");
+        }
+        passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
         return ResponseEntity.noContent().build();
     }
 

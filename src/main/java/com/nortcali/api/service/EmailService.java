@@ -22,4 +22,7 @@ public interface EmailService {
 
     /** Fase 9 (plan SaaS): disparado por {@code TenantInactivityScheduler} — destinatario es un superadmin, no el tenant. */
     void sendInactivityAlert(String toEmail, String tenantName, long daysInactive);
+
+    /** Recuperación de contraseña: enlace de un solo uso, expira en 1 hora (ver {@code PasswordResetServiceImpl}). */
+    void sendPasswordReset(String toEmail, String employeeName, String resetLink);
 }

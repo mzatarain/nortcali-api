@@ -48,7 +48,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
 
                 // ── Endpoints públicos ────────────────────────────────────────
-                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register").permitAll()
+                .requestMatchers("/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/auth/register",
+                        "/api/v1/auth/forgot-password", "/api/v1/auth/reset-password").permitAll()
                 .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                 // Fase 8 (plan SaaS): panel de superadmin — login público (valida contra la
                 // tabla separada `superadmins`), el resto de /superadmin/** exige ROLE_SUPERADMIN.
