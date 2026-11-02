@@ -144,7 +144,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     /** Fase 11 (plan SaaS): límite de empleados por plan — cuenta por tenant, no por restaurante. */
     private void enforceEmployeeLimit(com.nortcali.api.entity.Tenant tenant) {
-        PlanLimits limits = PlanLimits.fromPlan(tenant.getPlan());
+        PlanLimits limits = PlanLimits.forTenant(tenant);
         long current = employeeRepo.countDistinctActiveByRestaurantsTenantId(tenant.getId());
         if (current >= limits.getMaxEmployees()) {
             throw new BusinessRuleException("Tu plan " + limits.getDisplayName() + " permite hasta "

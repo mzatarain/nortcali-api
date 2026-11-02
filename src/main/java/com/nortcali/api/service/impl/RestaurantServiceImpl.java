@@ -72,7 +72,7 @@ public class RestaurantServiceImpl implements RestaurantService {
 
     /** Fase 11 (plan SaaS): límite de restaurantes por plan. */
     private void enforceRestaurantLimit(Tenant tenant) {
-        PlanLimits limits = PlanLimits.fromPlan(tenant.getPlan());
+        PlanLimits limits = PlanLimits.forTenant(tenant);
         long current = restaurantRepo.countByTenantIdAndIsActiveTrue(tenant.getId());
         if (current >= limits.getMaxRestaurants()) {
             throw new BusinessRuleException("Tu plan " + limits.getDisplayName() + " permite hasta "

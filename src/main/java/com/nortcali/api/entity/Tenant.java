@@ -30,6 +30,13 @@ public class Tenant {
     @Column(length = 50)
     private String plan;
 
+    /**
+     * Fase 13 (go-live, V32): tenant exento de cobro — hoy solo NortCali (tenant 1). Sin
+     * límites de plan, sin bloqueo de solo lectura por pago, fuera de Stripe y del MRR.
+     */
+    @Column(name = "billing_exempt", nullable = false)
+    private boolean billingExempt = false;
+
     @Column(name = "stripe_customer_id", length = 255)
     private String stripeCustomerId;
 
@@ -67,6 +74,9 @@ public class Tenant {
 
     public String getPlan() { return plan; }
     public void setPlan(String plan) { this.plan = plan; }
+
+    public boolean isBillingExempt() { return billingExempt; }
+    public void setBillingExempt(boolean billingExempt) { this.billingExempt = billingExempt; }
 
     public String getStripeCustomerId() { return stripeCustomerId; }
     public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }

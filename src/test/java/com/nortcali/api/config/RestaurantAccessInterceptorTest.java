@@ -254,6 +254,55 @@ class RestaurantAccessInterceptorTest {
         assertThat(result).isTrue();
     }
 
+    /** Fase 13 (go-live): NortCali exento de cobro — nunca queda en solo lectura por pago. */
+    @Test
+    void tenantExentoPastDue_metodoPost_dejaPasar() {
+        authenticateAs("cajero1");
+        Restaurant restaurant = restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.PAST_DUE, null);
+        restaurant.getTenant().setBillingExempt(true);
+        withEmployeeRestaurants("cajero1", Set.of(restaurant));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("POST");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+    }
+
+    @Test
+    void tenantExentoTrialSinSuscripcion_metodoPost_dejaPasar() {
+        authenticateAs("cajero1");
+        Restaurant restaurant = restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.TRIAL, null);
+        restaurant.getTenant().setBillingExempt(true);
+        withEmployeeRestaurants("cajero1", Set.of(restaurant));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("POST");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        boolean result = interceptor.preHandle(request, response, new Object());
+
+        assertThat(result).isTrue();
+    }
+
+    /** La suspensión manual del superadmin sigue aplicando aunque el tenant esté exento. */
+    @Test
+    void tenantExentoSuspendido_lanzaForbiddenException() {
+        authenticateAs("cajero1");
+        Restaurant restaurant = restaurantWithId(OWN_RESTAURANT_ID, OWN_TENANT_ID, TenantStatus.SUSPENDED, null);
+        restaurant.getTenant().setBillingExempt(true);
+        withEmployeeRestaurants("cajero1", Set.of(restaurant));
+
+        MockHttpServletRequest request = requestWithRestaurantId(OWN_RESTAURANT_ID, OWN_TENANT_ID);
+        request.setMethod("GET");
+        HttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> interceptor.preHandle(request, response, new Object()))
+                .isInstanceOf(ForbiddenException.class);
+    }
+
     private void authenticateAs(String email) {
         // 3 argumentos (con authorities, aunque vacías) marca el token como autenticado —
         // igual que JwtAuthFilter.doFilterInternal al construir el authToken real. El

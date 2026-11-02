@@ -112,15 +112,21 @@ public class SuperadminServiceImpl implements SuperadminService {
     public PlatformMetricsResponse getMetrics() {
         List<Tenant> all = tenantRepo.findAll();
 
-        long trial = 0, active = 0, pastDue = 0, suspended = 0, cancelled = 0, inactive = 0;
+        long trial = 0, active = 0, pastDue = 0, suspended = 0, cancelled = 0, inactive = 0, exempt = 0;
         BigDecimal mrr = BigDecimal.ZERO;
 
         for (Tenant tenant : all) {
+            if (tenant.isBillingExempt()) {
+                exempt++;
+            }
             switch (tenant.getStatus()) {
                 case TRIAL -> trial++;
                 case ACTIVE -> {
                     active++;
-                    mrr = mrr.add(planAmount(tenant.getPlan()));
+                    // Fase 13 (go-live): un tenant exento (NortCali) no es ingreso recurrente
+                    if (!tenant.isBillingExempt()) {
+                        mrr = mrr.add(planAmount(tenant.getPlan()));
+                    }
                     if (isInactive(tenant)) {
                         inactive++;
                     }
@@ -140,7 +146,7 @@ public class SuperadminServiceImpl implements SuperadminService {
                         .setScale(2, RoundingMode.HALF_UP);
 
         return new PlatformMetricsResponse(
-                all.size(), trial, active, pastDue, suspended, cancelled, mrr, churnRate, inactive);
+                all.size(), trial, active, pastDue, suspended, cancelled, mrr, churnRate, inactive, exempt);
     }
 
     private BigDecimal planAmount(String plan) {
@@ -246,7 +252,8 @@ public class SuperadminServiceImpl implements SuperadminService {
                 tenant.getTrialEndsAt(),
                 restaurantCount,
                 employeeCount,
-                lastConnection);
+                lastConnection,
+                tenant.isBillingExempt());
     }
 
     private static String sha256Hex(String input) {

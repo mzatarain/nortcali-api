@@ -80,6 +80,7 @@ public class BillingServiceImpl implements BillingService {
     public CheckoutSessionResponse createCheckoutSession(CheckoutSessionRequest request) {
         Employee employee = resolveAuthenticatedEmployee();
         Tenant tenant = resolveAuthenticatedTenant(employee);
+        rejectIfBillingExempt(tenant);
         String priceId = resolvePriceId(request.getPlan());
 
         ensureStripeCustomer(tenant, employee);
@@ -159,6 +160,7 @@ public class BillingServiceImpl implements BillingService {
     @Override
     public PortalSessionResponse createPortalSession() {
         Tenant tenant = resolveAuthenticatedTenant(resolveAuthenticatedEmployee());
+        rejectIfBillingExempt(tenant);
         if (tenant.getStripeCustomerId() == null) {
             throw new BusinessRuleException("Este negocio aún no tiene una suscripción activa en Stripe");
         }
@@ -187,6 +189,7 @@ public class BillingServiceImpl implements BillingService {
     @Override
     public SubscriptionStatusResponse cancelSubscription() {
         Tenant tenant = resolveAuthenticatedTenant(resolveAuthenticatedEmployee());
+        rejectIfBillingExempt(tenant);
         if (tenant.getStripeSubscriptionId() == null) {
             throw new BusinessRuleException("Este negocio no tiene una suscripción activa para cancelar");
         }
@@ -217,7 +220,28 @@ public class BillingServiceImpl implements BillingService {
                 tenant.getTrialEndsAt(),
                 tenant.getStripeCustomerId() != null,
                 tenant.getStripeSubscriptionId() != null,
-                tenant.isCancelAtPeriodEnd());
+                tenant.isCancelAtPeriodEnd(),
+                tenant.isBillingExempt());
+    }
+
+    /** Fase 13 (go-live): un tenant exento de cobro (NortCali) no opera con Stripe — evita un cobro accidental. */
+    private void rejectIfBillingExempt(Tenant tenant) {
+        if (tenant.isBillingExempt()) {
+            throw new BusinessRuleException("Este negocio tiene plan cortesía — no requiere suscripción ni pagos");
+        }
+    }
+
+    /**
+     * Fase 13 (go-live): los webhooks nunca cambian el estado de un tenant exento de cobro —
+     * aunque llegara un evento de Stripe con su customer (p.ej. datos heredados), su acceso no
+     * depende de Stripe.
+     */
+    private boolean skipIfBillingExempt(Tenant tenant, String eventType) {
+        if (tenant.isBillingExempt()) {
+            log.warn("Webhook {} ignorado: tenant {} está exento de cobro", eventType, tenant.getId());
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -256,6 +280,9 @@ public class BillingServiceImpl implements BillingService {
         }
         tenantRepo.findByStripeCustomerId(subscription.getCustomer()).ifPresentOrElse(
                 tenant -> {
+                    if (skipIfBillingExempt(tenant, "customer.subscription.trial_will_end")) {
+                        return;
+                    }
                     String email = resolveTenantAdminEmail(tenant);
                     if (email == null) {
                         log.warn("trial_will_end: tenant {} sin ningún empleado con email para notificar", tenant.getId());
@@ -290,6 +317,9 @@ public class BillingServiceImpl implements BillingService {
         if (tenant == null) {
             log.error("checkout.session.completed: no se encontró tenant (clientReferenceId={}, customer={})",
                     session.getClientReferenceId(), session.getCustomer());
+            return;
+        }
+        if (skipIfBillingExempt(tenant, "checkout.session.completed")) {
             return;
         }
 
@@ -347,6 +377,9 @@ public class BillingServiceImpl implements BillingService {
         }
         tenantRepo.findByStripeCustomerId(invoice.getCustomer()).ifPresentOrElse(
                 tenant -> {
+                    if (skipIfBillingExempt(tenant, "invoice → " + status)) {
+                        return;
+                    }
                     tenant.setStatus(status);
                     tenantRepo.save(tenant);
                     log.info("Tenant {} → status {} (customer={})", tenant.getId(), status, invoice.getCustomer());
@@ -381,6 +414,9 @@ public class BillingServiceImpl implements BillingService {
         // del tenant (stripe_subscription_id) debe poder cambiar su status — de lo contrario
         // cancelar una suscripción vieja marcaría como cancelado a un tenant que sigue activo.
         tenantRepo.findByStripeCustomerId(subscription.getCustomer()).ifPresent(tenant -> {
+            if (skipIfBillingExempt(tenant, "subscription → " + status)) {
+                return;
+            }
             if (!subscription.getId().equals(tenant.getStripeSubscriptionId())) {
                 log.info("Evento de subscription {} ignorado para tenant {}: no es su suscripción vigente ({})",
                         subscription.getId(), tenant.getId(), tenant.getStripeSubscriptionId());
@@ -408,6 +444,9 @@ public class BillingServiceImpl implements BillingService {
             return;
         }
         tenantRepo.findByStripeCustomerId(subscription.getCustomer()).ifPresent(tenant -> {
+            if (skipIfBillingExempt(tenant, "customer.subscription.updated")) {
+                return;
+            }
             if (!subscription.getId().equals(tenant.getStripeSubscriptionId())) {
                 return;
             }

@@ -114,6 +114,11 @@ public class RestaurantAccessInterceptor implements HandlerInterceptor {
                     "La suscripción de este negocio está " + status.name().toLowerCase()
                             + ". Contacta a soporte para reactivarla.");
         }
+        // Fase 13 (go-live): un tenant exento de cobro (NortCali) nunca queda en solo lectura
+        // por pago. La suspensión/cancelación manual de arriba sí le aplica (interruptor del superadmin).
+        if (tenant.isBillingExempt()) {
+            return;
+        }
         boolean readOnly = status == TenantStatus.PAST_DUE
                 || (status == TenantStatus.TRIAL && tenant.getStripeSubscriptionId() == null);
         if (readOnly && !"GET".equalsIgnoreCase(httpMethod)) {

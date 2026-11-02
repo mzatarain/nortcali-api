@@ -29,6 +29,17 @@ public enum PlanLimits {
     public int getMaxEmployees() { return maxEmployees; }
 
     /**
+     * Fase 13 (go-live): un tenant exento de cobro (NortCali) no tiene límites — se trata como
+     * Enterprise sin importar el `plan` guardado.
+     */
+    public static PlanLimits forTenant(com.nortcali.api.entity.Tenant tenant) {
+        if (tenant.isBillingExempt()) {
+            return ENTERPRISE;
+        }
+        return fromPlan(tenant.getPlan());
+    }
+
+    /**
      * Un tenant sin `plan` asignado (p.ej. en TRIAL antes de completar el checkout de Stripe)
      * se trata como el límite más restrictivo en vez de dejarlo pasar sin límite por accidente.
      */

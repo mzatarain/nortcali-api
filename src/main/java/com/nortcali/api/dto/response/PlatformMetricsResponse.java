@@ -6,7 +6,7 @@ import java.math.BigDecimal;
  * Fase 9 (plan SaaS): métricas de negocio del panel de superadmin — se derivan enteramente de
  * {@code tenants} (estado, plan) y de {@code employees.last_login}, sin llamadas a Stripe.
  * {@code mrr}: suma del precio de plan de los tenants {@code ACTIVE} (los únicos que se
- * consideran ingreso recurrente confirmado; {@code PAST_DUE} se excluye por estar en riesgo).
+ * consideran ingreso recurrente confirmado; {@code PAST_DUE} se excluye por estar en riesgo; los tenants exentos de cobro tampoco suman).
  * {@code churnRatePercent}: {@code cancelledTenants / (activeTenants + pastDueTenants + cancelledTenants)}
  * — una tasa acumulada de todo el histórico, no mensual (no existe timestamp de cambio de estado
  * previo a esta fase para calcular ventanas de tiempo).
@@ -20,5 +20,7 @@ public record PlatformMetricsResponse(
         long cancelledTenants,
         BigDecimal mrr,
         BigDecimal churnRatePercent,
-        long inactiveTenants
+        long inactiveTenants,
+        /** Fase 13 (go-live): tenants exentos de cobro — cuentan en sus estados pero no en el MRR. */
+        long billingExemptTenants
 ) {}

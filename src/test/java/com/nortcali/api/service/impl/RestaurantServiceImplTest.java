@@ -64,9 +64,14 @@ class RestaurantServiceImplTest {
     }
 
     private void mockAuthenticatedEmployee(String plan) {
+        mockAuthenticatedEmployee(plan, false);
+    }
+
+    private void mockAuthenticatedEmployee(String plan, boolean billingExempt) {
         Tenant tenant = new Tenant();
         tenant.setId(TENANT_ID);
         tenant.setPlan(plan);
+        tenant.setBillingExempt(billingExempt);
         Restaurant employeeRestaurant = new Restaurant();
         employeeRestaurant.setTenant(tenant);
         Employee employee = new Employee();
@@ -125,6 +130,21 @@ class RestaurantServiceImplTest {
         City city = city();
         when(cityRepo.findById(CITY_ID)).thenReturn(Optional.of(city));
         when(restaurantRepo.countByTenantIdAndIsActiveTrue(TENANT_ID)).thenReturn(50L);
+        when(mapper.toEntity(any())).thenReturn(new Restaurant());
+        when(restaurantRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.create(request());
+
+        verify(restaurantRepo).save(any());
+    }
+
+    /** Fase 13 (go-live): NortCali (exento de cobro) no tiene límite de sucursales aunque su plan guardado sea Básico/Pro. */
+    @Test
+    void create_tenantExento_nuncaBloqueaAunqueElPlanSeaBasico() {
+        mockAuthenticatedEmployee("basico", true);
+        City city = city();
+        when(cityRepo.findById(CITY_ID)).thenReturn(Optional.of(city));
+        when(restaurantRepo.countByTenantIdAndIsActiveTrue(TENANT_ID)).thenReturn(10L);
         when(mapper.toEntity(any())).thenReturn(new Restaurant());
         when(restaurantRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 

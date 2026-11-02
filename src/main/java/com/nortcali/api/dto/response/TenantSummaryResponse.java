@@ -14,5 +14,7 @@ public record TenantSummaryResponse(
         LocalDateTime trialEndsAt,
         int restaurantCount,
         long employeeCount,
-        LocalDateTime lastConnection
+        LocalDateTime lastConnection,
+        /** Fase 13 (go-live): exento de cobro — se muestra como "Cortesía" y no cuenta en el MRR. */
+        boolean billingExempt
 ) {}
