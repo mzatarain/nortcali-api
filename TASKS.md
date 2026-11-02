@@ -133,6 +133,14 @@ Seguimiento de tareas de desarrollo. Actualizar este archivo al iniciar o cerrar
 
 ---
 
+## 🚀 Go-live a producción (2026-11-01)
+
+El checklist ordenado de salida a producción (Stripe live, limpieza de DB, borrar tenants de
+prueba 3/8/9, NortCali exento de pago, infraestructura, secretos, verificación) vive en
+**`../SAAS-TASKS.md` → Fase 13**, porque toca API, panel, landing y DB a la vez. No duplicar aquí.
+
+---
+
 ## 🔴 Prioritario — Bloqueante para primer arranque
 
 - [x] **Permitir Swagger en `SecurityConfig`** — agregado `/swagger-ui/**`, `/swagger-ui.html`, `/v3/api-docs/**`
