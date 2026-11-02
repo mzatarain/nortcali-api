@@ -10,5 +10,7 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     List<Customer> findByRestaurantIdAndIsActiveTrue(Long restaurantId);
 
-    Optional<Customer> findByRestaurantIdAndPhone(Long restaurantId, String phone);
+    Optional<Customer> findFirstByRestaurantIdAndPhoneOrderByIdAsc(Long restaurantId, String phone);
+
+    boolean existsByRestaurantIdAndPhoneAndIdNot(Long restaurantId, String phone, Long id);
 }
