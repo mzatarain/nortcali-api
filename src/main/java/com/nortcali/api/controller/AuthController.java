@@ -109,7 +109,8 @@ public class AuthController {
             throw new BusinessRuleException("Demasiados intentos. Intenta de nuevo en un minuto.");
         }
 
-        Employee employee = registrationService.register(request);
+        Employee employee = registrationService.register(request,
+                httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent"));
         employee.setLastLogin(LocalDateTime.now());
         employeeRepo.save(employee);
 

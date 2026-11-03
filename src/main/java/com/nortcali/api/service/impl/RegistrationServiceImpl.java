@@ -3,16 +3,19 @@ package com.nortcali.api.service.impl;
 import com.nortcali.api.dto.request.RegisterRequest;
 import com.nortcali.api.entity.City;
 import com.nortcali.api.entity.Employee;
+import com.nortcali.api.entity.LegalAcceptance;
 import com.nortcali.api.entity.MenuCategory;
 import com.nortcali.api.entity.Restaurant;
 import com.nortcali.api.entity.SalesSource;
 import com.nortcali.api.entity.Tenant;
 import com.nortcali.api.entity.Unit;
 import com.nortcali.api.entity.enums.TenantStatus;
+import com.nortcali.api.exception.BusinessRuleException;
 import com.nortcali.api.exception.DuplicateResourceException;
 import com.nortcali.api.exception.ResourceNotFoundException;
 import com.nortcali.api.repository.CityRepository;
 import com.nortcali.api.repository.EmployeeRepository;
+import com.nortcali.api.repository.LegalAcceptanceRepository;
 import com.nortcali.api.repository.MenuCategoryRepository;
 import com.nortcali.api.repository.RestaurantRepository;
 import com.nortcali.api.repository.SalesSourceRepository;
@@ -20,6 +23,7 @@ import com.nortcali.api.repository.TenantRepository;
 import com.nortcali.api.repository.UnitRepository;
 import com.nortcali.api.service.EmailService;
 import com.nortcali.api.service.RegistrationService;
+import com.nortcali.api.util.LegalDocuments;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -78,6 +82,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     private final MenuCategoryRepository menuCategoryRepo;
     private final UnitRepository unitRepo;
     private final SalesSourceRepository salesSourceRepo;
+    private final LegalAcceptanceRepository legalAcceptanceRepo;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
 
@@ -88,6 +93,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                                    MenuCategoryRepository menuCategoryRepo,
                                    UnitRepository unitRepo,
                                    SalesSourceRepository salesSourceRepo,
+                                   LegalAcceptanceRepository legalAcceptanceRepo,
                                    PasswordEncoder passwordEncoder,
                                    EmailService emailService) {
         this.tenantRepo = tenantRepo;
@@ -97,12 +103,19 @@ public class RegistrationServiceImpl implements RegistrationService {
         this.menuCategoryRepo = menuCategoryRepo;
         this.unitRepo = unitRepo;
         this.salesSourceRepo = salesSourceRepo;
+        this.legalAcceptanceRepo = legalAcceptanceRepo;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
     }
 
     @Override
-    public Employee register(RegisterRequest request) {
+    public Employee register(RegisterRequest request, String ipAddress, String userAgent) {
+        // Defensa en profundidad: @AssertTrue ya lo valida en el controller, pero el servicio no
+        // debe poder crear un tenant sin evidencia de aceptación si se invoca por otra vía.
+        if (!Boolean.TRUE.equals(request.getAcceptLegal())) {
+            throw new BusinessRuleException(
+                    "Debes aceptar los Términos y Condiciones y el Aviso de Privacidad");
+        }
         if (employeeRepo.findByEmail(request.getAdminEmail()).isPresent()) {
             throw new DuplicateResourceException(
                     "Ya existe una cuenta con el correo '" + request.getAdminEmail() + "'");
@@ -142,11 +155,35 @@ public class RegistrationServiceImpl implements RegistrationService {
         employee = employeeRepo.save(employee);
 
         seedCatalogs(tenant, restaurant);
+        recordLegalAcceptance(tenant, employee, ipAddress, userAgent);
 
         log.info("Nuevo tenant '{}' registrado (id={}, restaurante={}, admin={})",
                 tenant.getName(), tenant.getId(), restaurant.getId(), employee.getEmail());
         emailService.sendWelcomeEmail(employee.getEmail(), employee.getFirstName(), tenant.getName());
         return employee;
+    }
+
+    /**
+     * Evidencia de la aceptación (versión de cada documento + IP + user-agent). Va dentro de la
+     * misma transacción que el alta: si falla, no queda un tenant sin aceptación registrada.
+     */
+    private void recordLegalAcceptance(Tenant tenant, Employee employee,
+                                       String ipAddress, String userAgent) {
+        LegalAcceptance acceptance = new LegalAcceptance();
+        acceptance.setTenant(tenant);
+        acceptance.setEmployee(employee);
+        acceptance.setTermsVersion(LegalDocuments.TERMS_VERSION);
+        acceptance.setPrivacyVersion(LegalDocuments.PRIVACY_VERSION);
+        acceptance.setIpAddress(truncate(ipAddress, 45));
+        acceptance.setUserAgent(truncate(userAgent, 255));
+        legalAcceptanceRepo.save(acceptance);
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null) {
+            return null;
+        }
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     private void seedCatalogs(Tenant tenant, Restaurant restaurant) {

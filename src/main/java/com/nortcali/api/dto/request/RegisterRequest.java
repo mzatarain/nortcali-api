@@ -1,5 +1,6 @@
 package com.nortcali.api.dto.request;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -47,6 +48,12 @@ public class RegisterRequest {
     @Size(max = 20, message = "El teléfono no puede superar los 20 caracteres")
     private String adminPhone;
 
+    // Checkbox obligatorio del formulario: acepta los Términos y Condiciones y el Aviso de
+    // Privacidad vigentes (LegalDocuments). @AssertTrue deja pasar null, por eso también @NotNull.
+    @NotNull(message = "Debes aceptar los Términos y Condiciones y el Aviso de Privacidad")
+    @AssertTrue(message = "Debes aceptar los Términos y Condiciones y el Aviso de Privacidad")
+    private Boolean acceptLegal;
+
     public String getBusinessName() { return businessName; }
     public void setBusinessName(String businessName) { this.businessName = businessName; }
 
@@ -73,4 +80,7 @@ public class RegisterRequest {
 
     public String getAdminPhone() { return adminPhone; }
     public void setAdminPhone(String adminPhone) { this.adminPhone = adminPhone; }
+
+    public Boolean getAcceptLegal() { return acceptLegal; }
+    public void setAcceptLegal(Boolean acceptLegal) { this.acceptLegal = acceptLegal; }
 }
