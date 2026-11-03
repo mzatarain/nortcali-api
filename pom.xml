@@ -148,7 +148,7 @@
 <dependency>
     <groupId>com.stripe</groupId>
     <artifactId>stripe-java</artifactId>
-    <version>29.0.0</version>
+    <version>33.4.2</version>
 </dependency>
 
 <!-- Email transaccional — Fase 5 del plan SaaS. JavaMailSender hablando SMTP contra AWS SES
